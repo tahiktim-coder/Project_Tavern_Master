@@ -1,0 +1,24 @@
+# Task List
+
+- [x] Brainstorming and Design
+  - [x] Create `game_design.md` with detailed game loop, similar games analysis, and mechanic ideas.
+  - [x] Review design with user.
+  - [x] Create `items_weapons.md` (Registry of Swords, Axes, Bows).
+  - [x] Create `items_armors.md` (Registry of Plate, Leather, Robes).
+  - [x] Create `items_magic.md` (Registry of Staffs, Scrolls, Artifacts).
+  - [x] Create `adventurers_registry.md` (Registry of Classes, Specialties, Traits).
+  - [x] Create `quests_registry.md` (Registry of Hunts, Escorts, Mysteries).
+  - [x] Create `mechanics_inspection.md` (Visual Tells, Dialogue Trees, Interrogation).
+  - [x] Create `generator_architecture.md` (Procedural DNA, Visual Slots, Backstory gen).
+  - [x] Create `world_biomes.md` (Environments, Hazards, Weather effects).
+  - [x] Create `mechanics_personalities.md` (Dialogue voices, Negotiation logic).
+- [/] Project Setup
+  - [ ] Create basic HTML/CSS structure (The "Counter" view).
+  - [ ] Implement basic game loop in JS.
+- [ ] Core Mechanics Implementation
+  - [ ] Adventurer Generation (Stats, Equipment, Visuals).
+  - [ ] Quest Generation (Difficulty, Requirements).
+  - [ ] The "Inspection" System (Comparing Adventurer to Quest).
+  - [ ] Result Simulation Logic.
+- [ ] UI/UX Design
+  - [ ] specific "Papers Please" style drag-and-drop or stamp interface.
