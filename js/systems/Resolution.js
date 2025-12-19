@@ -64,6 +64,15 @@ class ResolutionManager {
             // No reward
         }
 
+        // 3.5 PERSISTENCE SAVE
+        // If the system exists, save this adventurer's state
+        if (window.gameState && window.gameState.persistence) {
+            window.gameState.persistence.saveAdventurer(adventurer, {
+                questTitle: quest.title,
+                result: result
+            });
+        }
+
         // 4. RETURN RESULT (No Alert)
         // usage: gameState.activeReport = result;
         return {

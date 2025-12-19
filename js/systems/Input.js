@@ -97,15 +97,21 @@ class InputController {
         // CHECK 0.7: Reject Button? (Bottom Center)
         // Coords: 412, 600, 200x50
         if (pos.x >= 412 && pos.x <= 612 && pos.y >= 600 && pos.y <= 650) {
-            const event = new CustomEvent('nextAdventurer');
-            document.dispatchEvent(event);
+            // VISUAL: Trigger DISMISS Stamp
+            this.gameState.stamp = { type: 'DISMISSED', val: 0 }; // val 0->1 for animation
+
+            // Delay next adventurer
+            setTimeout(() => {
+                this.gameState.stamp = null;
+                const event = new CustomEvent('nextAdventurer');
+                document.dispatchEvent(event);
+            }, 800);
             return;
         }
 
         // CHECK 1: Clicked on a Quest on the Board?
         if (this.gameState.quests) {
-            // ... (keep existing quest pickup logic)
-            // Re-calculate the layout logic from Renderer (should really be shared, but simple enough to dup for now)
+            // Re-calculate the layout logic from Renderer
             const startX = 730;
             const startY = 240;
             const paperW = 50;
@@ -204,9 +210,15 @@ class InputController {
             }
             this.gameState.pendingReports.push(result);
 
-            // IMMEDIATE: Bring in new adventurer
-            const event = new CustomEvent('nextAdventurer');
-            document.dispatchEvent(event);
+            // VISUAL: Trigger ASSIGNED Stamp
+            this.gameState.stamp = { type: 'ASSIGNED', val: 0 };
+
+            // Delay next adventurer
+            setTimeout(() => {
+                this.gameState.stamp = null;
+                const event = new CustomEvent('nextAdventurer');
+                document.dispatchEvent(event);
+            }, 800);
         }
     }
 }

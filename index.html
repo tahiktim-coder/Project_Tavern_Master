@@ -11,7 +11,9 @@
     <script src="js/models/Adventurer.js"></script>
     <script src="js/systems/Resolution.js"></script>
     <script src="js/models/VisualTraits.js"></script>
+    <script src="js/models/VisualTraits.js"></script>
     <script src="js/systems/Inspector.js"></script>
+    <script src="js/systems/Persistence.js"></script>
     <script src="js/systems/Economy.js"></script>
     <script src="js/systems/Input.js"></script>
 </head>
@@ -301,7 +303,7 @@
 
                 this.ctx.fillStyle = "#ff6666";
                 this.ctx.font = "bold 20px monospace";
-                this.ctx.fillText("REJECT APPLICANT", 512, 632);
+                this.ctx.fillText("DISMISS", 512, 632);
 
 
                 // Draw Dragged Item (Floating on top)
@@ -318,6 +320,55 @@
                 if (gameState.inspectionData) {
                     this.drawInspectionWindow(gameState.inspectionData);
                 }
+
+                // Draw STAMP Animation
+                if (gameState.stamp) {
+                    this.drawStamp(gameState.stamp);
+                }
+            }
+
+            drawStamp(stamp) {
+                // Animate value
+                if (stamp.val < 1) stamp.val += 0.08;
+                // Easing (Boomerang effect or straight slam?)
+                const scale = 2.0 - Math.min(1.0, stamp.val); // 2.0 -> 1.0
+                const alpha = Math.min(1, stamp.val * 3);
+
+                this.ctx.save();
+                this.ctx.translate(this.width / 2, this.height / 2);
+                this.ctx.scale(scale, scale);
+
+                // Tilt it slightly random each time?
+                this.ctx.rotate((stamp.type === 'ASSIGNED' ? -0.1 : 0.1));
+
+                this.ctx.globalAlpha = alpha;
+
+                // WAX SEAL STYLE
+                const color = stamp.type === 'ASSIGNED' ? "#8b0000" : "#222"; // Dark Red for Quest, Dark Grey for Dismiss
+
+                // Outer Ring (Uneven wax)
+                this.ctx.fillStyle = color;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, 100, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Inner Ring
+                this.ctx.strokeStyle = "rgba(0,0,0,0.3)";
+                this.ctx.lineWidth = 4;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, 85, 0, Math.PI * 2);
+                this.ctx.stroke();
+
+                // Text
+                this.ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                this.ctx.font = "bold 24px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.textBaseline = "middle";
+                this.ctx.shadowColor = "black";
+                this.ctx.shadowBlur = 2;
+                this.ctx.fillText(stamp.type, 0, 0);
+
+                this.ctx.restore();
             }
 
             drawInspectionWindow(data) {
@@ -645,13 +696,27 @@
 
             // Initialize Systems
             gameState.economy = new window.GameSystems.EconomyManager(100);
-            gameState.inspector = new window.GameSystems.Inspector(); // NEW
+            gameState.inspector = new window.GameSystems.Inspector();
+            gameState.persistence = new window.GameSystems.PersistenceManager(); // NEW
             const input = new window.GameSystems.InputController(canvas, gameState);
 
             // Event: Next Adventurer (Same Day)
             document.addEventListener('nextAdventurer', () => {
-                // Just generate a new person
-                gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
+                // Chance to return old adventurer?
+                let returningParams = null;
+                // 30% chance if we have history
+                if (gameState.persistence && Math.random() < 0.3) {
+                    returningParams = gameState.persistence.getReturningAdventurer();
+                }
+
+                if (returningParams) {
+                    console.log("RETURNING HERO:", returningParams.name);
+                    gameState.currentAdventurer = new window.GameSystems.Adventurer(returningParams);
+                    // Force refresh visuals in case traits changed
+                    // (Constructor calls generateVisuals, so it should be fine if traits are passed correctly)
+                } else {
+                    gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
+                }
             });
 
             // Event: Manual End Day
