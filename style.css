@@ -1,18 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
 :root {
-    --bg-color: #2c2c2c;
+    --bg-color: #1a1a1a;
     --text-color: #f0f0f0;
 }
 
-body, html {
+* {
     margin: 0;
     padding: 0;
+    box-sizing: border-box;
+}
+
+body,
+html {
     width: 100%;
     height: 100%;
     background-color: var(--bg-color);
-    color: var(--text-color);
-    font-family: 'Press Start 2P', cursive; /* Pixel art font */
     overflow: hidden;
     display: flex;
     justify-content: center;
@@ -20,17 +23,22 @@ body, html {
 }
 
 #game-container {
+    /* Responsive: Scale to fit viewport while maintaining 4:3 aspect ratio */
+    width: min(100vw, calc(100vh * 4 / 3));
+    height: min(100vh, calc(100vw * 3 / 4));
+    max-width: 1024px;
+    max-height: 768px;
     position: relative;
-    width: 1024px;
-    height: 768px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    background-color: #1a1a1a;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
 }
 
 #game-canvas {
+    /* Canvas fills container and scales with it */
     width: 100%;
     height: 100%;
-    image-rendering: pixelated; /* CRITICAL for pixel art */
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
 }
 
 #ui-layer {
@@ -39,5 +47,21 @@ body, html {
     left: 0;
     width: 100%;
     height: 100%;
-    pointer-events: none; /* Let clicks pass through to canvas if needed, or manage pointer events on specific UI children */
+    pointer-events: none;
+}
+
+#debug-console {
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: lime;
+    background: rgba(0, 0, 0, 0.9);
+    font-family: monospace;
+    font-size: 12px;
+    padding: 10px;
+    pointer-events: none;
+    max-height: 200px;
+    overflow: hidden;
+    z-index: 100;
+    display: none;
 }

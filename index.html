@@ -1,18 +1,704 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guild Master</title>
     <link rel="stylesheet" href="style.css">
+    <script src="js/data/traitData.js"></script>
+    <script src="js/data/questData.js"></script>
+    <script src="js/models/Adventurer.js"></script>
+    <script src="js/systems/Resolution.js"></script>
+    <script src="js/models/VisualTraits.js"></script>
+    <script src="js/systems/Inspector.js"></script>
+    <script src="js/systems/Economy.js"></script>
+    <script src="js/systems/Input.js"></script>
 </head>
+
 <body>
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
-        <div id="ui-layer">
-            <!-- UI Elements will be injected here or drawn on canvas -->
+        <div id="ui-layer"></div>
+        <div id="debug-console"
+            style="position: absolute; top: 0; left: 0; color: lime; background: rgba(0,0,0,0.8); font-family: monospace; padding: 10px; pointer-events: none; width: 100%; height: 50%; overflow: hidden; display: none;">
         </div>
     </div>
-    <script src="script.js" type="module"></script>
+    <!-- Debug Console Script -->
+    <script>
+        const debugConsole = document.getElementById('debug-console');
+        debugConsole.style.display = 'block'; // Make visible immediately
+        debugConsole.innerHTML = "<div>Status: Debug Console Loaded...</div>";
+
+        function logToScreen(msg, color = 'white') {
+            debugConsole.innerHTML += `<div style="color: ${color};">${msg}</div>`;
+        }
+
+        // Global Error Handler
+        window.onerror = function (msg, url, line, col, error) {
+            const fileName = url ? url.split('/').pop() : 'unknown';
+            logToScreen(`ERROR: ${msg} <br> File: ${fileName} : Line ${line}`, 'red');
+            return false;
+        };
+
+        // Async Promise Error Handler
+        window.addEventListener('unhandledrejection', function (event) {
+            logToScreen(`ASYNC ERROR: ${event.reason}`, 'orange');
+        });
+
+        // Console Log Override
+        const originalLog = console.log;
+        console.log = function (...args) {
+            originalLog.apply(console, args);
+            logToScreen(`LOG: ${args.join(' ')}`, '#00FF00');
+        };
+
+        logToScreen("Waiting for module to load...", 'yellow');
+
+        // 1. DATA (Previously adventurerData.js)
+        const ADVENTURER_DATA = {
+            archetypes: {
+                MARTIAL: {
+                    name: "Martial",
+                    classes: [
+                        { id: "knight", name: "Knight-Errant", traits: ["Honorbound", "Arrogant"], stats: { str: [8, 10], int: [2, 5], dex: [4, 6] } },
+                        { id: "barbarian", name: "Barbarian", traits: ["Battle-Rage", "Illiterate"], stats: { str: [9, 10], int: [1, 3], dex: [5, 7] } },
+                        { id: "mercenary", name: "Mercenary", traits: ["Greedy", "Pragmatic"], stats: { str: [6, 8], int: [4, 6], dex: [5, 7] } },
+                        { id: "pit_fighter", name: "Pit Fighter", traits: ["Sadist", "Showman"], stats: { str: [7, 9], int: [2, 4], dex: [7, 9] } },
+                        { id: "guard", name: "Town Guard", traits: ["Lazy", "Corrupt"], stats: { str: [5, 7], int: [3, 5], dex: [4, 6] } },
+                        { id: "ronin", name: "Ronin", traits: ["Wanderer", "Disciplined"], stats: { str: [7, 9], int: [4, 6], dex: [8, 10] } }
+                    ]
+                },
+                ARCANE: {
+                    name: "Arcane",
+                    classes: [
+                        { id: "battle_mage", name: "Battle Mage", traits: ["Pyromaniac", "Short-Tempered"], stats: { str: [4, 6], int: [8, 10], dex: [4, 6] } },
+                        { id: "scholar", name: "Scholar", traits: ["Cowardly", "Curious"], stats: { str: [2, 4], int: [9, 10], dex: [3, 5] } },
+                        { id: "necromancer", name: "Necromancer", traits: ["Outcast", "Creepy"], stats: { str: [3, 5], int: [8, 10], dex: [3, 5] } },
+                        { id: "illusionist", name: "Illusionist", traits: ["Liar", "Kleptomaniac"], stats: { str: [3, 5], int: [7, 9], dex: [8, 10] } },
+                        { id: "elementalist", name: "Elementalist", traits: ["Volatile", "Connected"], stats: { str: [4, 6], int: [7, 9], dex: [5, 7] } },
+                        { id: "hedge_wizard", name: "Hedge Wizard", traits: ["Helpful", "Unlicensed"], stats: { str: [3, 5], int: [5, 7], dex: [4, 6] } }
+                    ]
+                },
+                CUNNING: {
+                    name: "Cunning",
+                    classes: [
+                        { id: "rogue", name: "Rogue", traits: ["Greedy", "Traitor"], stats: { str: [3, 5], int: [5, 7], dex: [8, 10] } },
+                        { id: "ranger", name: "Ranger", traits: ["Loner", "Nature-Lover"], stats: { str: [5, 7], int: [4, 6], dex: [8, 10] } },
+                        { id: "bard", name: "Bard", traits: ["Drunk", "Flirtatious"], stats: { str: [3, 5], int: [6, 8], dex: [7, 9] } },
+                        { id: "assassin", name: "Assassin", traits: ["Cold-Blooded", "Contract_Killer"], stats: { str: [5, 7], int: [6, 8], dex: [9, 10] } },
+                        { id: "treasure_hunter", name: "Treasure Hunter", traits: ["Obsessive", "Unlucky"], stats: { str: [4, 6], int: [5, 8], dex: [7, 9] } },
+                        { id: "spy", name: "Spy", traits: ["Double Agent", "Paranoid"], stats: { str: [4, 6], int: [8, 10], dex: [6, 8] } }
+                    ]
+                },
+                DIVINE: {
+                    name: "Divine",
+                    classes: [
+                        { id: "cleric", name: "Cleric", traits: ["Zealot", "Pacifist"], stats: { str: [5, 7], int: [7, 9], dex: [3, 5] } },
+                        { id: "paladin", name: "Paladin", traits: ["Lawful Stupid", "Judgemental"], stats: { str: [8, 10], int: [4, 6], dex: [4, 6] } },
+                        { id: "druid", name: "Druid", traits: ["Feral", "Territorial"], stats: { str: [5, 7], int: [6, 8], dex: [6, 8] } },
+                        { id: "monk", name: "Monk", traits: ["Vow of Silence", "Disciplined"], stats: { str: [7, 9], int: [6, 8], dex: [9, 10] } },
+                        { id: "cultist", name: "Cultist", traits: ["Insane", "Doomed"], stats: { str: [4, 6], int: [5, 7], dex: [5, 7] } }
+                    ]
+                }
+            }
+        };
+
+        // 2. MODEL (Imported from js/models/Adventurer.js)
+        // class Adventurer removed to avoid duplicate declaration error
+
+
+        // 3. GENERATOR (Previously adventurerGenerator.js)
+        class AdventurerGenerator {
+            static generate(day = 1) {
+                const archetypeKeys = Object.keys(ADVENTURER_DATA.archetypes);
+                const archetypeKey = archetypeKeys[Math.floor(Math.random() * archetypeKeys.length)];
+                const archetypeData = ADVENTURER_DATA.archetypes[archetypeKey];
+                const charClass = archetypeData.classes[Math.floor(Math.random() * archetypeData.classes.length)];
+
+                const stats = {
+                    str: this.randomRange(charClass.stats.str[0], charClass.stats.str[1]),
+                    int: this.randomRange(charClass.stats.int[0], charClass.stats.int[1]),
+                    dex: this.randomRange(charClass.stats.dex[0], charClass.stats.dex[1]),
+                    vit: this.randomRange(3, 8)
+                };
+
+                const traits = [...charClass.traits];
+                const equipment = { mainHand: "Basic Weapon", armor: "Basic Armor" };
+                const names = ["Garrett", "Lyra", "Thorn", "Elara", "Ragnar", "Sylas"];
+                const name = names[Math.floor(Math.random() * names.length)] + " the " + charClass.name;
+
+                return new Adventurer({
+                    name: name,
+                    archetype: archetypeKey,
+                    classId: charClass.id,
+                    stats: stats,
+                    traits: traits,
+                    equipment: equipment
+                });
+            }
+
+            static randomRange(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+        }
+
+        // 4. RENDERER (Previously Renderer.js)
+        class Renderer {
+            constructor(canvas) {
+                this.ctx = canvas.getContext('2d');
+                this.width = canvas.width;
+                this.height = canvas.height;
+                this.assets = {};
+                this.isLoaded = false;
+            }
+
+            loadAssets() {
+                return new Promise((resolve) => {
+                    let loaded = 0;
+                    const checkDone = () => { if (++loaded >= 2) resolve(); };
+
+                    // Start Screen Background (New Optimized Title Screen)
+                    const imgStart = new Image();
+                    imgStart.src = 'assets/title_screen.png';
+                    imgStart.onload = () => { this.assets['bg_start'] = imgStart; checkDone(); };
+                    imgStart.onerror = () => { logToScreen("Start BG Failed", 'orange'); checkDone(); };
+
+                    // Game Screen Background (Papers Please POV Counter View)
+                    const imgGame = new Image();
+                    imgGame.src = 'assets/counter_view.png';
+                    imgGame.onload = () => { this.assets['bg_game'] = imgGame; logToScreen("Game BG Loaded", 'lime'); checkDone(); };
+                    imgGame.onerror = () => { logToScreen("Game BG Failed", 'orange'); checkDone(); };
+                });
+            }
+
+            draw(gameState) {
+                this.ctx.clearRect(0, 0, this.width, this.height);
+
+                // Select Background based on Screen State
+                let bgKey = gameState.screen === 'START' ? 'bg_start' : 'bg_game';
+                if (this.assets[bgKey]) {
+                    this.ctx.drawImage(this.assets[bgKey], 0, 0, this.width, this.height);
+                } else {
+                    this.ctx.fillStyle = "#3e3e3e";
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                }
+
+                if (gameState.screen === 'START') {
+                    this.drawStartScreen();
+                } else if (gameState.screen === 'GAME') {
+                    this.drawGameScreen(gameState);
+                } else if (gameState.screen === 'REPORT') {
+                    this.drawMorningReport(gameState);
+                }
+            }
+
+            drawMorningReport(gameState) {
+                // Background
+                this.ctx.fillStyle = "#222";
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Title
+                this.ctx.fillStyle = "#FFD700";
+                this.ctx.font = "bold 40px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText(`MORNING REPORT - DAY ${gameState.day}`, this.width / 2, 80);
+
+                // List content
+                let y = 150;
+                this.ctx.font = "18px monospace";
+                this.ctx.textAlign = "left";
+
+                if (gameState.pendingReports && gameState.pendingReports.length > 0) {
+                    gameState.pendingReports.forEach(report => {
+                        // Colorize result
+                        this.ctx.fillStyle = report.result === "SUCCESS" ? "lime" : (report.result === "FAILURE" ? "red" : "orange");
+                        this.ctx.fillText(`[${report.result}] ${report.questTitle} (Assigned to: ${report.adventurerName})`, 100, y);
+
+                        this.ctx.fillStyle = "#aaa";
+                        this.ctx.fillText(`   > ${report.flavorText}`, 100, y + 25);
+
+                        if (report.score) { // Debug score
+                            // this.ctx.fillText(`   > Score: ${report.score.toFixed(0)}`, 800, y);
+                        }
+
+                        y += 60;
+                    });
+                } else {
+                    this.ctx.fillStyle = "#aaa";
+                    this.ctx.fillText("No quests were undertaken yesterday.", 100, y);
+                }
+
+                // Continue Button
+                this.ctx.fillStyle = "#fff";
+                this.ctx.font = "bold 24px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText("[PRESS SPACE TO OPEN GUILD]", this.width / 2, this.height - 100);
+            }
+
+            drawStartScreen() {
+                // Dim background
+                this.ctx.fillStyle = "rgba(0,0,0,0.6)";
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Title
+                this.ctx.fillStyle = "#FFD700";
+                this.ctx.font = "bold 60px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.shadowColor = "black";
+                this.ctx.shadowBlur = 10;
+                this.ctx.fillText("GUILD MASTER", this.width / 2, this.height / 2 - 50);
+                this.ctx.shadowBlur = 0;
+
+                // Play Button
+                this.ctx.fillStyle = "#8B4513";
+                this.ctx.fillRect(this.width / 2 - 100, this.height / 2 + 50, 200, 60);
+                this.ctx.border = "2px solid #fff";
+
+                this.ctx.fillStyle = "#fff";
+                this.ctx.font = "30px monospace";
+                this.ctx.fillText("PLAY", this.width / 2, this.height / 2 + 90);
+
+                this.ctx.font = "16px monospace";
+                this.ctx.fillStyle = "#ccc";
+                this.ctx.fillText("[Press SPACE or Click]", this.width / 2, this.height / 2 + 150);
+            }
+
+            drawGameScreen(gameState) {
+                // Draw Quests on Board
+                if (gameState.quests) {
+                    this.drawQuestBoard(gameState.quests);
+                }
+
+                // Draw Adventurer
+                const hero = gameState.currentAdventurer;
+                if (hero) {
+                    this.drawAdventurerPlaceholder(hero);
+                }
+
+                // UI: Gold & Day
+                this.ctx.fillStyle = "#FFD700";
+                this.ctx.font = "bold 24px monospace";
+                this.ctx.textAlign = "left";
+                this.ctx.fillText(`Gold: ${gameState.economy.gold}`, 20, 40);
+
+                this.ctx.fillStyle = "white";
+                this.ctx.fillText(`Day: ${gameState.day}`, 20, 70);
+
+                // UI: End Day Button
+                this.ctx.fillStyle = "#8b0000";
+                this.ctx.fillRect(850, 20, 150, 50);
+                this.ctx.fillStyle = "white";
+                this.ctx.font = "bold 16px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText("END DAY", 925, 50);
+
+                // UI: Reject Button (Bottom Center)
+                this.ctx.fillStyle = "#444";
+                this.ctx.fillRect(412, 600, 200, 50);
+                this.ctx.strokeStyle = "#888";
+                this.ctx.strokeRect(412, 600, 200, 50);
+
+                this.ctx.fillStyle = "#ff6666";
+                this.ctx.font = "bold 20px monospace";
+                this.ctx.fillText("REJECT APPLICANT", 512, 632);
+
+
+                // Draw Dragged Item (Floating on top)
+                if (gameState.dragState) {
+                    this.drawDraggedQuest(gameState.dragState);
+                }
+
+                // Draw Report Overlay
+                if (gameState.report) {
+                    this.drawReportCard(gameState.report);
+                }
+
+                // Draw Inspection Overlay (if active)
+                if (gameState.inspectionData) {
+                    this.drawInspectionWindow(gameState.inspectionData);
+                }
+            }
+
+            drawInspectionWindow(data) {
+                const x = 50;
+                const y = 200;
+                const w = 300;
+                const h = 400;
+
+                // Panel
+                this.ctx.fillStyle = "rgba(0, 20, 40, 0.9)";
+                this.ctx.fillRect(x, y, w, h);
+                this.ctx.strokeStyle = "cyan";
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(x, y, w, h);
+
+                // Header
+                this.ctx.fillStyle = "cyan";
+                this.ctx.font = "bold 18px monospace";
+                this.ctx.textAlign = "left";
+                this.ctx.fillText("INSPECTION SCANNER", x + 15, y + 30);
+                this.ctx.fillRect(x + 15, y + 40, w - 30, 2);
+
+                // Name
+                this.ctx.fillStyle = "white";
+                this.ctx.font = "bold 16px monospace";
+                this.ctx.fillText(data.name, x + 15, y + 70);
+
+                // Details
+                this.ctx.font = "14px monospace";
+                this.ctx.fillStyle = "#aaa";
+
+                let ly = y + 100;
+                data.details.forEach(detail => {
+                    this.ctx.fillText(`> ${detail}`, x + 15, ly);
+                    ly += 25;
+                });
+            }
+
+            drawReportCard(report) {
+                // Dim bg
+                this.ctx.fillStyle = "rgba(0,0,0,0.7)";
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                const cx = this.width / 2;
+                const cy = this.height / 2;
+                const w = 400;
+                const h = 300;
+
+                // Card body
+                this.ctx.fillStyle = "#fff";
+                this.ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+                this.ctx.strokeStyle = "#444";
+                this.ctx.lineWidth = 4;
+                this.ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+
+                // Header
+                this.ctx.fillStyle = report.result === "SUCCESS" ? "green" : (report.result === "FAILURE" ? "red" : "orange");
+                this.ctx.font = "bold 30px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText(report.result, cx, cy - 80);
+
+                // Title
+                this.ctx.fillStyle = "#222";
+                this.ctx.font = "bold 18px monospace";
+                this.ctx.fillText(report.questTitle, cx, cy - 40);
+
+                // Body
+                this.ctx.font = "14px monospace";
+                this.ctx.fillStyle = "#555";
+
+                // Text wrapping logic (simple)
+                const words = report.flavorText.split(' ');
+                let line = '';
+                let ly = cy + 10;
+                for (let n = 0; n < words.length; n++) {
+                    const testLine = line + words[n] + ' ';
+                    const metrics = this.ctx.measureText(testLine);
+                    if (metrics.width > w - 40 && n > 0) {
+                        this.ctx.fillText(line, cx, ly);
+                        line = words[n] + ' ';
+                        ly += 20;
+                    } else {
+                        line = testLine;
+                    }
+                }
+                this.ctx.fillText(line, cx, ly);
+
+                // Button Prompt
+                this.ctx.fillStyle = "#888";
+                this.ctx.font = "12px monospace";
+                this.ctx.fillText("[Click to Continue]", cx, cy + 120);
+            }
+
+            drawDraggedQuest(dragState) {
+                const x = dragState.x; // Mouse is center for simplicity or offset?
+                const y = dragState.y;
+                const paperW = 60; // Slightly larger when dragged?
+                const paperH = 70;
+
+                this.ctx.save();
+                this.ctx.translate(x, y);
+                this.ctx.rotate(-0.1); // Tilt for effect
+
+                // Shadow (Floating effect)
+                this.ctx.shadowColor = "rgba(0,0,0,0.5)";
+                this.ctx.shadowBlur = 10;
+                this.ctx.shadowOffsetY = 10;
+
+                // Paper
+                this.ctx.fillStyle = "#f0e6d2";
+                this.ctx.fillRect(-paperW / 2, -paperH / 2, paperW, paperH);
+
+                // Text Lines
+                this.ctx.fillStyle = "#6d4c41";
+                this.ctx.fillRect(-paperW / 2 + 5, -paperH / 2 + 10, paperW - 10, 2);
+                this.ctx.fillRect(-paperW / 2 + 5, -paperH / 2 + 16, paperW - 10, 2);
+
+                // Rank
+                this.ctx.fillStyle = "#8b0000";
+                this.ctx.beginPath();
+                this.ctx.arc(0, paperH / 2 - 15, 10, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                this.ctx.fillStyle = "white";
+                this.ctx.font = "bold 12px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText(dragState.item.rank, 0, paperH / 2 - 11);
+
+                this.ctx.restore();
+            }
+
+            drawAdventurerPlaceholder(hero) {
+                const cx = this.width / 2;
+                const cy = this.height / 2 - 50;
+
+                // 1. BASE SILHOUETTE
+                this.ctx.fillStyle = "rgba(50, 50, 50, 1.0)";
+
+                // Change color/shape based on stats?
+                // For now, keep it dark silhouette but add details
+                if (hero.visuals.includes("scrawny")) {
+                    this.ctx.fillStyle = "rgba(60, 60, 60, 1.0)"; // Lighter/Thinner look notionally
+                }
+
+                this.ctx.beginPath();
+                // If muscles, make wider
+                let width = hero.visuals.includes("muscles") ? 100 : 80;
+                if (hero.visuals.includes("scrawny")) width = 60;
+
+                this.ctx.ellipse(cx, cy + 50, width, 180, 0, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // 2. RENDER VISUAL TELLS (The Clues)
+
+                // GLOWING EYES
+                if (hero.visuals.includes("glowing_eyes")) {
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.shadowColor = "cyan";
+                    this.ctx.fillStyle = "cyan";
+                    this.ctx.beginPath();
+                    this.ctx.arc(cx - 20, cy - 80, 5, 0, Math.PI * 2); // Left Eye
+                    this.ctx.arc(cx + 20, cy - 80, 5, 0, Math.PI * 2); // Right Eye
+                    this.ctx.fill();
+                    this.ctx.shadowBlur = 0;
+                }
+
+                // JEWELRY (Gold necklace/chain)
+                if (hero.visuals.includes("jewelry")) {
+                    this.ctx.strokeStyle = "gold";
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.arc(cx, cy - 30, 40, 0, Math.PI, false); // Necklace arc
+                    this.ctx.stroke();
+                    // Gem
+                    this.ctx.fillStyle = "red";
+                    this.ctx.beginPath();
+                    this.ctx.arc(cx, cy + 10, 8, 0, Math.PI * 2); // Pendant
+                    this.ctx.fill();
+                }
+
+                // PRISTINE ARMOR (Shiny)
+                if (hero.visuals.includes("pristine_armor")) {
+                    this.ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(cx - 30, cy);
+                    this.ctx.lineTo(cx + 30, cy + 20);
+                    this.ctx.lineTo(cx - 30, cy + 40);
+                    this.ctx.fill(); // Shine streak
+                }
+
+                // RUSTY GEAR (Brown splotches)
+                if (hero.visuals.includes("rusty_gear")) {
+                    this.ctx.fillStyle = "#8b4513";
+                    this.ctx.fillRect(cx - 40, cy + 20, 10, 10);
+                    this.ctx.fillRect(cx + 30, cy + 60, 15, 15);
+                }
+
+                // BANDAGED (White strips)
+                if (hero.visuals.includes("bandaged")) {
+                    this.ctx.strokeStyle = "#eee";
+                    this.ctx.lineWidth = 4;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(cx - 50, cy + 50);
+                    this.ctx.lineTo(cx - 20, cy + 60);
+                    this.ctx.stroke(); // Arm bandage
+
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(cx + 20, cy - 100);
+                    this.ctx.lineTo(cx + 50, cy - 90);
+                    this.ctx.stroke(); // Head bandage
+                }
+
+                // 3. SHAKING ANIMATION (Procedural)
+                let offsetX = 0;
+                if (hero.visuals.includes("shaking")) {
+                    offsetX = (Math.random() - 0.5) * 5; // Jitter
+                }
+
+                // Re-draw Name with Jitter
+                this.ctx.fillStyle = "#ffffff";
+                this.ctx.font = "bold 20px 'Press Start 2P', monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.shadowColor = "black";
+                this.ctx.shadowBlur = 4;
+                this.ctx.fillText(hero.name, cx + offsetX, cy - 150);
+                this.ctx.shadowBlur = 0;
+
+                // Question Mark (if mystery, maybe remove this eventually?)
+                this.ctx.fillStyle = "#FFD700";
+                this.ctx.font = "bold 48px monospace";
+                this.ctx.fillText("?", cx, cy + 60);
+            }
+
+            drawQuestBoard(quests) {
+                if (!quests || quests.length === 0) return;
+
+                // Board Area (Calculated)
+                const startX = 730;
+                const startY = 240;
+                const paperW = 50;
+                const paperH = 60;
+                const gap = 12;
+                const cols = 3;
+
+                this.ctx.save();
+                this.ctx.shadowColor = "rgba(0,0,0,0.5)";
+                this.ctx.shadowBlur = 2;
+                this.ctx.shadowOffsetX = 2;
+                this.ctx.shadowOffsetY = 2;
+
+                quests.forEach((quest, index) => {
+                    // Skip if currently being dragged (implied by Input logic, need to check logic)
+                    if (gameState.dragState && gameState.dragState.item === quest) return;
+
+                    const col = index % cols;
+                    const row = Math.floor(index / cols);
+                    const x = startX + col * (paperW + gap);
+                    const y = startY + row * (paperH + gap) + (index % 2 * 5); // Slight stagger
+
+                    // Paper Background
+                    this.ctx.fillStyle = "#f0e6d2"; // Parchment
+                    this.ctx.fillRect(x, y, paperW, paperH);
+
+                    // Text Lines (Abstract)
+                    this.ctx.fillStyle = "#6d4c41";
+                    this.ctx.fillRect(x + 5, y + 10, paperW - 10, 2);
+                    this.ctx.fillRect(x + 5, y + 16, paperW - 10, 2);
+                    this.ctx.fillRect(x + 5, y + 22, paperW - 20, 2);
+
+                    // Seal/Stamp
+                    this.ctx.fillStyle = (quest.rank === 'S' || quest.rank === 'A') ? "#8b0000" : "#4a3728";
+                    this.ctx.beginPath();
+                    this.ctx.arc(x + paperW / 2, y + paperH - 12, 6, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // Rank Label
+                    this.ctx.fillStyle = "white";
+                    this.ctx.font = "bold 8px monospace";
+                    this.ctx.textAlign = "center";
+                    this.ctx.fillText(quest.rank, x + paperW / 2, y + paperH - 10);
+                });
+                this.ctx.restore();
+            }
+        }
+
+        // 5. MAIN LOOP
+        const canvas = document.getElementById('game-canvas');
+        canvas.width = 1024;
+        canvas.height = 768;
+        const renderer = new Renderer(canvas);
+
+        let gameState = {
+            screen: 'START', // START, GAME, REPORT
+            day: 1,
+            currentAdventurer: null,
+            pendingReports: [] // Stores results from the day
+        };
+
+        function startGame() {
+            gameState.screen = 'GAME';
+            startNewDay();
+        }
+
+        function startNewDay() {
+            gameState.day++;
+            gameState.pendingReports = []; // Clear previous day's reports
+
+            // Generate Adventurer
+            gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
+
+            // Load Quests (from Data Layer)
+            if (window.GameData && window.GameData.Quests) {
+                // Shuffle and pick 3-6
+                const count = Math.floor(Math.random() * 4) + 3;
+                gameState.quests = [...window.GameData.Quests].sort(() => 0.5 - Math.random()).slice(0, count);
+            } else {
+                console.warn("Quests not loaded!");
+                gameState.quests = [];
+            }
+        }
+
+        async function init() {
+            document.getElementById('debug-console').style.display = 'none';
+            await renderer.loadAssets();
+
+            // Initialize Systems
+            gameState.economy = new window.GameSystems.EconomyManager(100);
+            gameState.inspector = new window.GameSystems.Inspector(); // NEW
+            const input = new window.GameSystems.InputController(canvas, gameState);
+
+            // Event: Next Adventurer (Same Day)
+            document.addEventListener('nextAdventurer', () => {
+                // Just generate a new person
+                gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
+            });
+
+            // Event: Manual End Day
+            document.addEventListener('endDayManual', () => {
+                // Process Upkeep
+                const upkeep = gameState.economy.processDailyUpkeep();
+                if (upkeep.bankrupt) {
+                    alert("GAME OVER: You ran out of gold!");
+                    location.reload();
+                    return;
+                }
+
+                // Switch to Report View instead of immediately starting new day
+                gameState.screen = 'REPORT';
+            });
+
+            // Input (Keyboard still useful for debug/start)
+            window.addEventListener('keydown', (e) => {
+                if (gameState.screen === 'START') {
+                    if (e.code === 'Space' || e.code === 'Enter') startGame();
+                } else if (gameState.screen === 'GAME') {
+                    // if (e.code === 'Space') startNewDay(); // Disable space to skip
+                } else if (gameState.screen === 'REPORT') {
+                    if (e.code === 'Space') {
+                        gameState.screen = 'GAME';
+                        startNewDay();
+                    }
+                }
+            });
+
+            // Mouse Click for Start
+            canvas.addEventListener('click', () => {
+                if (gameState.screen === 'START') startGame();
+            });
+
+            gameLoop();
+        }
+
+        function gameLoop() {
+            renderer.draw(gameState);
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start immediately
+        init();
+    </script>
+    <!-- REMOVED script.js import -->
 </body>
+
 </html>

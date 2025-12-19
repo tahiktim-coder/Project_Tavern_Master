@@ -1,5 +1,9 @@
+```javascript
+import { AdventurerGenerator } from './src/generators/adventurerGenerator.js';
+import { Renderer } from './src/systems/Renderer.js';
+
 const canvas = document.getElementById('game-canvas');
-const ctx = canvas.getContext('2d');
+const renderer = new Renderer(canvas);
 
 // Game Constants
 const SCREEN_WIDTH = 1024;
@@ -14,30 +18,46 @@ let gameState = {
     day: 1,
     gold: 100,
     reputation: 50,
+    currentAdventurer: null,
     adventurerQueue: []
 };
 
-function init() {
+async function init() {
+    document.getElementById('debug-console').style.display = 'block'; // Show debug output
     console.log("Guild Master Initializing...");
-    // Placeholder: Draw something to prove it works
-    ctx.fillStyle = "#3e3e3e";
-    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    await renderer.loadAssets();
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "20px 'Press Start 2P'";
-    ctx.fillText("Guild Master - Day " + gameState.day, 20, 40);
-    
-    ctx.fillStyle = "#aaaaaa";
-    ctx.fillText("Waiting for adventurers...", SCREEN_WIDTH/2 - 150, SCREEN_HEIGHT/2);
+    // Generate first adventurer
+    startNewDay();
+
+    // Input Handling (Simple click to next day for testing)
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            startNewDay();
+        }
+    });
 
     gameLoop();
 }
 
+function startNewDay() {
+    gameState.day++;
+    gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
+    console.log("New Day Started:", gameState.currentAdventurer);
+}
+
 function gameLoop() {
+    renderer.draw(gameState);
     requestAnimationFrame(gameLoop);
-    // Update
-    // Draw
 }
 
 // Start
-window.onload = init;
+// window.onload = init; // Module is already deferred, just call init
+init().catch(e => {
+    console.error("FATAL INIT ERROR:", e);
+    const consoleEl = document.getElementById('debug-console');
+    if (consoleEl) {
+        consoleEl.innerHTML += `< div style = "color:red" > INIT ERROR: ${ e.message }</div > `;
+    }
+});
+```
