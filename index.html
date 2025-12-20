@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guild Master</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
     <script src="js/data/traitData.js"></script>
     <script src="js/data/questData.js"></script>
     <script src="js/models/Adventurer.js"></script>
@@ -196,46 +197,104 @@
             }
 
             drawMorningReport(gameState) {
-                // Background
-                this.ctx.fillStyle = "#222";
+                // 1. Background (Wooden Table)
+                this.ctx.fillStyle = "#3d2817"; // Dark wood
                 this.ctx.fillRect(0, 0, this.width, this.height);
-
-                // Title
-                this.ctx.fillStyle = "#FFD700";
-                this.ctx.font = "bold 40px monospace";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText(`MORNING REPORT - DAY ${gameState.day}`, this.width / 2, 80);
-
-                // List content
-                let y = 150;
-                this.ctx.font = "18px monospace";
-                this.ctx.textAlign = "left";
-
-                if (gameState.pendingReports && gameState.pendingReports.length > 0) {
-                    gameState.pendingReports.forEach(report => {
-                        // Colorize result
-                        this.ctx.fillStyle = report.result === "SUCCESS" ? "lime" : (report.result === "FAILURE" ? "red" : "orange");
-                        this.ctx.fillText(`[${report.result}] ${report.questTitle} (Assigned to: ${report.adventurerName})`, 100, y);
-
-                        this.ctx.fillStyle = "#aaa";
-                        this.ctx.fillText(`   > ${report.flavorText}`, 100, y + 25);
-
-                        if (report.score) { // Debug score
-                            // this.ctx.fillText(`   > Score: ${report.score.toFixed(0)}`, 800, y);
-                        }
-
-                        y += 60;
-                    });
-                } else {
-                    this.ctx.fillStyle = "#aaa";
-                    this.ctx.fillText("No quests were undertaken yesterday.", 100, y);
+                // Wood grain lines (simple)
+                this.ctx.fillStyle = "#4a321e";
+                for (let i = 0; i < this.height; i += 40) {
+                    this.ctx.fillRect(0, i, this.width, 2);
                 }
 
-                // Continue Button
-                this.ctx.fillStyle = "#fff";
-                this.ctx.font = "bold 24px monospace";
+                // 2. The Ledger (Open Book)
+                const bookW = 800;
+                const bookH = 600;
+                const bx = (this.width - bookW) / 2;
+                const by = (this.height - bookH) / 2;
+
+                // Cover (Leather)
+                this.ctx.fillStyle = "#2a1a10";
+                this.ctx.fillRect(bx - 20, by - 20, bookW + 40, bookH + 40);
+
+                // Pages
+                this.ctx.fillStyle = "#f5e6d3"; // Parchment
+                this.ctx.fillRect(bx, by, bookW / 2 - 5, bookH); // Left Page
+                this.ctx.fillRect(bx + bookW / 2 + 5, by, bookW / 2 - 5, bookH); // Right Page
+
+                // Spine Shadow
+                this.ctx.fillStyle = "rgba(0,0,0,0.2)";
+                this.ctx.fillRect(bx + bookW / 2 - 20, by, 40, bookH);
+
+                // 3. Text Content
+                this.ctx.fillStyle = "#3e2723"; // Ink
+                this.ctx.font = "bold 32px 'MedievalSharp', cursive";
                 this.ctx.textAlign = "center";
-                this.ctx.fillText("[PRESS SPACE TO OPEN GUILD]", this.width / 2, this.height - 100);
+                this.ctx.fillText("Guild Daily Ledger", bx + bookW / 4, by + 60);
+                this.ctx.fillText("Day " + gameState.day, bx + bookW * 0.75, by + 60);
+
+                // Separator Lines
+                this.ctx.fillRect(bx + 40, by + 80, bookW / 2 - 80, 2);
+                this.ctx.fillRect(bx + bookW / 2 + 40, by + 80, bookW / 2 - 80, 2);
+
+                // Entries (Render on Left Page first, then spill to Right)
+                this.ctx.font = "16px 'MedievalSharp', cursive";
+                this.ctx.textAlign = "left";
+
+                let cx = bx + 40;
+                let cy = by + 120;
+                let pageSwap = false;
+
+                if (gameState.pendingReports && gameState.pendingReports.length > 0) {
+                    gameState.pendingReports.forEach((report, idx) => {
+                        // Check for page overflow/switch
+                        if (cy > by + bookH - 100 && !pageSwap) {
+                            pageSwap = true;
+                            cx = bx + bookW / 2 + 40;
+                            cy = by + 120;
+                        }
+
+                        // Colors for stamps/marks
+                        const markColor = report.result === "SUCCESS" ? "#2e7d32" : (report.result === "FAILURE" ? "#c62828" : "#ef6c00");
+
+                        // Entry Header
+                        this.ctx.fillStyle = markColor;
+                        this.ctx.font = "bold 16px 'MedievalSharp', cursive";
+                        const resultMark = report.result === "SUCCESS" ? "[✔]" : (report.result === "FAILURE" ? "[✖]" : "[?]");
+                        this.ctx.fillText(`${resultMark} ${report.questTitle}`, cx, cy);
+
+                        // Adventurer Name
+                        this.ctx.fillStyle = "#5d4037";
+                        this.ctx.font = "italic 14px 'MedievalSharp', cursive";
+                        this.ctx.fillText(`   Assigned: ${report.adventurerName}`, cx, cy + 20);
+
+                        // Outcome/Flavor
+                        this.ctx.fillStyle = "#3e2723";
+                        this.ctx.font = "14px 'MedievalSharp', cursive";
+                        // Wrap text roughly
+                        let desc = "> " + report.flavorText;
+                        if (desc.length > 40) {
+                            this.ctx.fillText(desc.substring(0, 40) + "...", cx, cy + 40);
+                        } else {
+                            this.ctx.fillText(desc, cx, cy + 40);
+                        }
+
+                        cy += 70; // Spacing per entry
+                    });
+                } else {
+                    this.ctx.fillStyle = "#8d6e63";
+                    this.ctx.fillText("No guild activity recorded.", cx, cy);
+                }
+
+                // 4. Continue Prompt (Bookmark?)
+                this.ctx.fillStyle = "#8b0000";
+                this.ctx.fillRect(bx + bookW - 60, by + bookH, 40, 60); // Bookmark sticking out
+
+                this.ctx.fillStyle = "white";
+                this.ctx.font = "bold 16px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText("NEXT", bx + bookW - 40, by + bookH + 35);
+                this.ctx.font = "12px monospace";
+                this.ctx.fillText("(SPC)", bx + bookW - 40, by + bookH + 50);
             }
 
             drawStartScreen() {
@@ -287,23 +346,49 @@
                 this.ctx.fillStyle = "white";
                 this.ctx.fillText(`Day: ${gameState.day}`, 20, 70);
 
-                // UI: End Day Button
-                this.ctx.fillStyle = "#8b0000";
-                this.ctx.fillRect(850, 20, 150, 50);
-                this.ctx.fillStyle = "white";
-                this.ctx.font = "bold 16px monospace";
+                // UI: End Day (Hanging Sign Top Right)
+                // Draw Rope
+                this.ctx.strokeStyle = "#5d4037";
+                this.ctx.lineWidth = 4;
+                this.ctx.beginPath();
+                this.ctx.moveTo(925, 0);
+                this.ctx.lineTo(925, 30);
+                this.ctx.stroke();
+
+                // Draw Sign Board
+                this.ctx.fillStyle = "#4a321e"; // Wood
+                this.ctx.fillRect(860, 30, 130, 50);
+                this.ctx.fillStyle = "#3e2723"; // Border
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(860, 30, 130, 50);
+
+                this.ctx.fillStyle = "#d7ccc8"; // Text
+                this.ctx.font = "bold 18px 'MedievalSharp', cursive";
                 this.ctx.textAlign = "center";
-                this.ctx.fillText("END DAY", 925, 50);
+                this.ctx.fillText("END DAY", 925, 62);
 
-                // UI: Reject Button (Bottom Center)
-                this.ctx.fillStyle = "#444";
-                this.ctx.fillRect(412, 600, 200, 50);
-                this.ctx.strokeStyle = "#888";
-                this.ctx.strokeRect(412, 600, 200, 50);
 
-                this.ctx.fillStyle = "#ff6666";
-                this.ctx.font = "bold 20px monospace";
-                this.ctx.fillText("DISMISS", 512, 632);
+                // UI: Dismiss Area (Bottom Right - "The Door")
+                // Instead of a button, an area to drag to? Or just a clickable "Exit" sign?
+                // Let's make it a robust Stone Button/Plaque at the bottom
+                const btnX = 412;
+                const btnY = 620;
+                const btnW = 200;
+                const btnH = 60;
+
+                // Stone Texture
+                this.ctx.fillStyle = "#546e7a";
+                this.ctx.fillRect(btnX, btnY, btnW, btnH);
+
+                // Bevel
+                this.ctx.fillStyle = "#78909c";
+                this.ctx.fillRect(btnX, btnY, btnW, 4); // Top highlight
+                this.ctx.fillStyle = "#37474f";
+                this.ctx.fillRect(btnX, btnY + btnH - 4, btnW, 4); // Bottom shadow
+
+                this.ctx.fillStyle = "#eceff1";
+                this.ctx.font = "bold 22px 'MedievalSharp', cursive";
+                this.ctx.fillText("DISMISS", btnX + btnW / 2, btnY + 38);
 
 
                 // Draw Dragged Item (Floating on top)
@@ -330,43 +415,68 @@
             drawStamp(stamp) {
                 // Animate value
                 if (stamp.val < 1) stamp.val += 0.08;
-                // Easing (Boomerang effect or straight slam?)
-                const scale = 2.0 - Math.min(1.0, stamp.val); // 2.0 -> 1.0
+                const scale = 2.5 - Math.min(1.0, stamp.val) * 1.5; // 2.5 -> 1.0 big slam
                 const alpha = Math.min(1, stamp.val * 3);
 
                 this.ctx.save();
                 this.ctx.translate(this.width / 2, this.height / 2);
                 this.ctx.scale(scale, scale);
-
-                // Tilt it slightly random each time?
-                this.ctx.rotate((stamp.type === 'ASSIGNED' ? -0.1 : 0.1));
+                this.ctx.rotate((Math.random() - 0.5) * 0.2); // Organic rotation
 
                 this.ctx.globalAlpha = alpha;
 
-                // WAX SEAL STYLE
-                const color = stamp.type === 'ASSIGNED' ? "#8b0000" : "#222"; // Dark Red for Quest, Dark Grey for Dismiss
-
-                // Outer Ring (Uneven wax)
+                // 1. WAX BLOB (Organic Shape)
+                const color = stamp.type === 'ASSIGNED' ? "#8b0000" : "#2f2f2f";
                 this.ctx.fillStyle = color;
+
                 this.ctx.beginPath();
-                this.ctx.arc(0, 0, 100, 0, Math.PI * 2);
+                // Draw a wobbly circle
+                for (let i = 0; i <= Math.PI * 2; i += 0.2) {
+                    let r = 100 + Math.random() * 10 - 5;
+                    this.ctx.lineTo(Math.cos(i) * r, Math.sin(i) * r);
+                }
+                this.ctx.closePath();
                 this.ctx.fill();
 
-                // Inner Ring
-                this.ctx.strokeStyle = "rgba(0,0,0,0.3)";
+                // Inner rim hint
+                this.ctx.strokeStyle = "rgba(0,0,0,0.2)";
                 this.ctx.lineWidth = 4;
-                this.ctx.beginPath();
-                this.ctx.arc(0, 0, 85, 0, Math.PI * 2);
                 this.ctx.stroke();
 
-                // Text
-                this.ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-                this.ctx.font = "bold 24px monospace";
-                this.ctx.textAlign = "center";
-                this.ctx.textBaseline = "middle";
-                this.ctx.shadowColor = "black";
-                this.ctx.shadowBlur = 2;
-                this.ctx.fillText(stamp.type, 0, 0);
+                // 2. EMBOSSED SIGIL (Sword/Shield or X)
+                this.ctx.fillStyle = "rgba(0,0,0,0.3)"; // Embossed shadow look
+
+                if (stamp.type === 'ASSIGNED') {
+                    // Draw Shield Crest
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(-40, -50);
+                    this.ctx.lineTo(40, -50);
+                    this.ctx.lineTo(40, 10);
+                    this.ctx.quadraticCurveTo(0, 60, -40, 10);
+                    this.ctx.closePath();
+                    this.ctx.fill();
+
+                    // Sword line
+                    this.ctx.fillStyle = "rgba(0,0,0,0.4)";
+                    this.ctx.fillRect(-5, -70, 10, 120);
+                    this.ctx.fillRect(-20, -40, 40, 10); // Hilt
+                } else {
+                    // Draw "X" or "Dismiss Hand"
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(-50, -50);
+                    this.ctx.lineTo(50, 50);
+                    this.ctx.stroke();
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(50, -50);
+                    this.ctx.lineTo(-50, 50);
+                    this.ctx.stroke();
+                }
+
+                // 3. TEXT on the Rim (Small, Medieval)
+                // this.ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+                // this.ctx.font = "bold 16px MedievalSharp";
+                // this.ctx.textAlign = "center";
+                // this.ctx.fillText(stamp.type, 0, 80); 
 
                 this.ctx.restore();
             }
@@ -396,14 +506,34 @@
                 this.ctx.font = "bold 16px monospace";
                 this.ctx.fillText(data.name, x + 15, y + 70);
 
-                // Details
+                // Details (with wrapping)
                 this.ctx.font = "14px monospace";
                 this.ctx.fillStyle = "#aaa";
 
                 let ly = y + 100;
+                const maxDetailWidth = w - 30;
+                const maxY = y + h - 20; // Prevent overflow
                 data.details.forEach(detail => {
-                    this.ctx.fillText(`> ${detail}`, x + 15, ly);
-                    ly += 25;
+                    if (ly >= maxY) return; // Stop if we're out of space
+                    const prefix = '> ';
+                    const words = detail.split(' ');
+                    let line = prefix;
+                    words.forEach(word => {
+                        const testLine = line + word + ' ';
+                        if (this.ctx.measureText(testLine).width > maxDetailWidth) {
+                            if (ly < maxY) {
+                                this.ctx.fillText(line, x + 15, ly);
+                                ly += 20;
+                            }
+                            line = '  ' + word + ' '; // Indent continuation
+                        } else {
+                            line = testLine;
+                        }
+                    });
+                    if (ly < maxY) {
+                        this.ctx.fillText(line, x + 15, ly);
+                        ly += 25;
+                    }
                 });
             }
 
@@ -463,39 +593,86 @@
             }
 
             drawDraggedQuest(dragState) {
-                const x = dragState.x; // Mouse is center for simplicity or offset?
+                const x = dragState.x;
                 const y = dragState.y;
-                const paperW = 60; // Slightly larger when dragged?
-                const paperH = 70;
+                const paperW = 240; // MUCH LARGER
+                const paperH = 300;
 
                 this.ctx.save();
                 this.ctx.translate(x, y);
-                this.ctx.rotate(-0.1); // Tilt for effect
+                this.ctx.rotate(-0.05);
 
-                // Shadow (Floating effect)
-                this.ctx.shadowColor = "rgba(0,0,0,0.5)";
-                this.ctx.shadowBlur = 10;
-                this.ctx.shadowOffsetY = 10;
+                // Shadow
+                this.ctx.shadowColor = "rgba(0,0,0,0.6)";
+                this.ctx.shadowBlur = 20;
+                this.ctx.shadowOffsetY = 20;
 
                 // Paper
                 this.ctx.fillStyle = "#f0e6d2";
                 this.ctx.fillRect(-paperW / 2, -paperH / 2, paperW, paperH);
 
-                // Text Lines
-                this.ctx.fillStyle = "#6d4c41";
-                this.ctx.fillRect(-paperW / 2 + 5, -paperH / 2 + 10, paperW - 10, 2);
-                this.ctx.fillRect(-paperW / 2 + 5, -paperH / 2 + 16, paperW - 10, 2);
+                // Border
+                this.ctx.strokeStyle = "#5d4037";
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(-paperW / 2, -paperH / 2, paperW, paperH);
+
+                // Title
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.font = "bold 20px 'MedievalSharp', cursive";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText(dragState.item.title, 0, -paperH / 2 + 35);
 
                 // Rank
-                this.ctx.fillStyle = "#8b0000";
-                this.ctx.beginPath();
-                this.ctx.arc(0, paperH / 2 - 15, 10, 0, Math.PI * 2);
-                this.ctx.fill();
+                this.ctx.fillStyle = "#b71c1c";
+                this.ctx.font = "bold 32px monospace";
+                this.ctx.fillText("RANK: " + dragState.item.rank, 0, -paperH / 2 + 70);
 
-                this.ctx.fillStyle = "white";
+                // Description
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.font = "14px monospace";
+                this.ctx.textAlign = "left";
+
+                const words = (dragState.item.desc || "").split(' ');
+                let line = '';
+                let ly = -paperH / 2 + 110;
+                const startX = -paperW / 2 + 15;
+                const maxWidth = paperW - 30;
+
+                words.forEach(word => {
+                    const testLine = line + word + ' ';
+                    if (this.ctx.measureText(testLine).width > maxWidth) {
+                        this.ctx.fillText(line, startX, ly);
+                        line = word + ' ';
+                        ly += 20;
+                    } else {
+                        line = testLine;
+                    }
+                });
+                this.ctx.fillText(line, startX, ly);
+
+                // Tags (with wrapping)
+                ly += 30;
                 this.ctx.font = "bold 12px monospace";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText(dragState.item.rank, 0, paperH / 2 - 11);
+                this.ctx.fillStyle = "#5d4037";
+                this.ctx.fillText("Tags:", startX, ly);
+                ly += 18;
+                this.ctx.font = "italic 11px monospace";
+                if (dragState.item.tags) {
+                    const tagText = dragState.item.tags.join(", ");
+                    let tagLine = '';
+                    const tagWords = tagText.split(', ');
+                    tagWords.forEach((tag, idx) => {
+                        const testLine = tagLine + (tagLine ? ', ' : '') + tag;
+                        if (this.ctx.measureText(testLine).width > maxWidth) {
+                            this.ctx.fillText(tagLine, startX, ly);
+                            ly += 16;
+                            tagLine = tag;
+                        } else {
+                            tagLine = testLine;
+                        }
+                    });
+                    if (tagLine) this.ctx.fillText(tagLine, startX, ly);
+                }
 
                 this.ctx.restore();
             }
@@ -589,7 +766,7 @@
 
                 // Re-draw Name with Jitter
                 this.ctx.fillStyle = "#ffffff";
-                this.ctx.font = "bold 20px 'Press Start 2P', monospace";
+                this.ctx.font = "bold 20px 'MedievalSharp', monospace";
                 this.ctx.textAlign = "center";
                 this.ctx.shadowColor = "black";
                 this.ctx.shadowBlur = 4;
@@ -606,11 +783,11 @@
                 if (!quests || quests.length === 0) return;
 
                 // Board Area (Calculated)
-                const startX = 730;
-                const startY = 240;
-                const paperW = 50;
-                const paperH = 60;
-                const gap = 12;
+                const startX = 640;
+                const startY = 220;
+                const paperW = 100;
+                const paperH = 130;
+                const gap = 15;
                 const cols = 3;
 
                 this.ctx.save();
@@ -632,23 +809,28 @@
                     this.ctx.fillStyle = "#f0e6d2"; // Parchment
                     this.ctx.fillRect(x, y, paperW, paperH);
 
-                    // Text Lines (Abstract)
-                    this.ctx.fillStyle = "#6d4c41";
-                    this.ctx.fillRect(x + 5, y + 10, paperW - 10, 2);
-                    this.ctx.fillRect(x + 5, y + 16, paperW - 10, 2);
-                    this.ctx.fillRect(x + 5, y + 22, paperW - 20, 2);
+                    // Title (readable)
+                    this.ctx.fillStyle = "#3e2723";
+                    this.ctx.font = "bold 11px monospace";
+                    this.ctx.textAlign = "center";
+                    const words = quest.title.split(' ');
+                    if (words.length > 2) {
+                        this.ctx.fillText(words.slice(0, 2).join(' '), x + paperW / 2, y + 25);
+                        this.ctx.fillText(words.slice(2).join(' '), x + paperW / 2, y + 40);
+                    } else {
+                        this.ctx.fillText(quest.title, x + paperW / 2, y + 30);
+                    }
 
-                    // Seal/Stamp
+                    // Rank Label (Large)
+                    this.ctx.fillStyle = "#b71c1c";
+                    this.ctx.font = "bold 32px monospace";
+                    this.ctx.fillText(quest.rank, x + paperW / 2, y + paperH / 2 + 20);
+
+                    // Seal at bottom
                     this.ctx.fillStyle = (quest.rank === 'S' || quest.rank === 'A') ? "#8b0000" : "#4a3728";
                     this.ctx.beginPath();
-                    this.ctx.arc(x + paperW / 2, y + paperH - 12, 6, 0, Math.PI * 2);
+                    this.ctx.arc(x + paperW / 2, y + paperH - 20, 10, 0, Math.PI * 2);
                     this.ctx.fill();
-
-                    // Rank Label
-                    this.ctx.fillStyle = "white";
-                    this.ctx.font = "bold 8px monospace";
-                    this.ctx.textAlign = "center";
-                    this.ctx.fillText(quest.rank, x + paperW / 2, y + paperH - 10);
                 });
                 this.ctx.restore();
             }
@@ -731,6 +913,7 @@
 
                 // Switch to Report View instead of immediately starting new day
                 gameState.screen = 'REPORT';
+                gameState.reportOpenedAt = Date.now(); // Prevent immediate click-through
             });
 
             // Input (Keyboard still useful for debug/start)
@@ -747,9 +930,17 @@
                 }
             });
 
-            // Mouse Click for Start
+            // Mouse Click for Start and Report
             canvas.addEventListener('click', () => {
                 if (gameState.screen === 'START') startGame();
+                else if (gameState.screen === 'REPORT') {
+                    // Prevent click-through: require 300ms delay after report opens
+                    if (gameState.reportOpenedAt && Date.now() - gameState.reportOpenedAt < 300) {
+                        return; // Ignore click
+                    }
+                    gameState.screen = 'GAME';
+                    startNewDay();
+                }
             });
 
             gameLoop();

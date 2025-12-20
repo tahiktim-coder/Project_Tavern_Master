@@ -86,19 +86,19 @@ class InputController {
             return;
         }
 
-        // CHECK 0.5: End Day Button? (Top Right)
-        // Coords based on Renderer (approx 850, 30, 150x50)
-        if (pos.x >= 850 && pos.x <= 1000 && pos.y >= 20 && pos.y <= 70) {
+        // CHECK 0.5: End Day Button? (Top Right - Hanging Sign)
+        // New Renderer: x=860, y=30, w=130, h=50
+        if (pos.x >= 860 && pos.x <= 990 && pos.y >= 30 && pos.y <= 80) {
             const event = new CustomEvent('endDayManual');
             document.dispatchEvent(event);
             return;
         }
 
-        // CHECK 0.7: Reject Button? (Bottom Center)
-        // Coords: 412, 600, 200x50
-        if (pos.x >= 412 && pos.x <= 612 && pos.y >= 600 && pos.y <= 650) {
+        // CHECK 0.7: Dismiss Button? (Bottom Center - Stone Plaque)
+        // New Renderer: x=412, y=620, w=200, h=60
+        if (pos.x >= 412 && pos.x <= 612 && pos.y >= 620 && pos.y <= 680) {
             // VISUAL: Trigger DISMISS Stamp
-            this.gameState.stamp = { type: 'DISMISSED', val: 0 }; // val 0->1 for animation
+            this.gameState.stamp = { type: 'DISMISSED', val: 0 };
 
             // Delay next adventurer
             setTimeout(() => {
@@ -111,12 +111,12 @@ class InputController {
 
         // CHECK 1: Clicked on a Quest on the Board?
         if (this.gameState.quests) {
-            // Re-calculate the layout logic from Renderer
-            const startX = 730;
-            const startY = 240;
-            const paperW = 50;
-            const paperH = 60;
-            const gap = 12;
+            // Re-calculate the layout logic from Renderer (MUST MATCH RENDERER)
+            const startX = 640;
+            const startY = 220;
+            const paperW = 100;
+            const paperH = 130;
+            const gap = 15;
             const cols = 3;
 
             // Iterate in reverse (top items first)
@@ -162,63 +162,100 @@ class InputController {
     }
 
     handleMouseUp(e) {
-        if (!this.isDragging) return;
+        console.log("Input: handleMouseUp() called, isDragging =", this.isDragging);
+        if (!this.isDragging) {
+            console.log("Input: Not dragging, returning early");
+            return;
+        }
 
         const pos = this.getMousePos(e);
+        console.log("Input: Mouse position:", pos);
 
         // DROP LOGIC
-        // Check if dropped on Adventurer (Center Screen)
+        // Target: Adventurer (Center Screen)
+        // Visual is at width/2, height/2 - 50. Size is varying but approx 100 wide, 200 tall.
+
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height / 2;
-        const dropZoneRadius = 150; // Roughly the adventurer area
 
-        const dist = Math.sqrt(Math.pow(pos.x - centerX, 2) + Math.pow(pos.y - centerY, 2));
+        // Rectangular Hitbox for reliability
+        const hitX = centerX - 100;
+        const hitY = centerY - 150;
+        const hitW = 200;
+        const hitH = 300;
 
-        if (dist < dropZoneRadius) {
+        console.log("Input: Checking drop zone. Mouse:", pos.x, pos.y, "Zone:", hitX, hitY, hitW, hitH);
+
+        if (pos.x > hitX && pos.x < hitX + hitW &&
+            pos.y > hitY && pos.y < hitY + hitH) {
+
             // Valid Drop on Adventurer!
+            console.log("Input: Quest Dropped on Adventurer - calling triggerAssignment");
             this.triggerAssignment(this.dragItem.data);
+            console.log("Input: triggerAssignment returned, continuing to cleanup");
         } else {
-            // Invalid Drop - Snap back (just clear drag state)
-            console.log("Returned to board");
+            // Drop on Board / Empty Space -> Return to Board
+            console.log("Input: Quest Returned to Board");
+            // No logic needed, just clearing drag state puts it back visually
         }
 
         // Cleanup
+        console.log("Input: CLEANUP STARTING - isDragging:", this.isDragging, "dragItem:", this.dragItem, "dragState:", this.gameState.dragState);
         this.isDragging = false;
         this.dragItem = null;
         this.gameState.dragState = null;
+        console.log("Input: CLEANUP COMPLETE - isDragging:", this.isDragging, "dragItem:", this.dragItem, "dragState:", this.gameState.dragState);
     }
 
     triggerAssignment(quest) {
-        if (!this.gameState.currentAdventurer) return;
+        console.log("Input: triggerAssignment() called with quest:", quest ? quest.title : "null");
+        if (!this.gameState.currentAdventurer) {
+            console.log("Input: No current adventurer, aborting");
+            return;
+        }
+        console.log("Input: Current adventurer exists:", this.gameState.currentAdventurer.name);
 
         // Remove quest from available list
         const idx = this.gameState.quests.indexOf(quest);
         if (idx > -1) {
             this.gameState.quests.splice(idx, 1);
+            console.log("Input: Quest removed from board at index", idx);
+        } else {
+            console.log("Input: WARNING - Quest not found in quests array");
         }
 
         // Trigger Resolution
-        if (window.GameSystems.ResolutionManager) {
+        console.log("Input: Checking ResolutionManager...", typeof window.GameSystems, typeof window.GameSystems.ResolutionManager);
+        if (window.GameSystems && window.GameSystems.ResolutionManager) {
+            console.log("Input: ResolutionManager found! Calling resolve()");
             // Hack: Attach economy ref to adventurer temporarily
             this.gameState.currentAdventurer.economyRef = this.gameState.economy;
 
             const result = window.GameSystems.ResolutionManager.resolve(quest, this.gameState.currentAdventurer);
+            console.log("Input: Resolution complete, result:", result);
 
             // STORE RESULT FOR LATER (Delayed Reporting)
             if (!this.gameState.pendingReports) {
                 this.gameState.pendingReports = [];
             }
             this.gameState.pendingReports.push(result);
+            console.log("Input: Result added to pending reports");
 
             // VISUAL: Trigger ASSIGNED Stamp
             this.gameState.stamp = { type: 'ASSIGNED', val: 0 };
+            console.log("Input: Stamp set to ASSIGNED");
 
             // Delay next adventurer
+            console.log("Input: Starting 800ms timer for next adventurer...");
             setTimeout(() => {
+                console.log("Input: Timer complete! Clearing stamp and dispatching nextAdventurer event");
                 this.gameState.stamp = null;
                 const event = new CustomEvent('nextAdventurer');
                 document.dispatchEvent(event);
+                console.log("Input: nextAdventurer event dispatched");
             }, 800);
+        } else {
+            console.log("Input: ERROR - ResolutionManager not found!");
         }
     }
 }
