@@ -11,18 +11,43 @@ class PersistenceManager {
         this.maxHistory = 50;
     }
 
-    saveAdventurer(adventurer, report) {
-        if (!adventurer || !adventurer.id) return;
+    addToRoster(adventurer) {
+        if (!adventurer) return;
+        if (!adventurer.id) adventurer.id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        const data = this._createData(adventurer);
+        this.roster.set(data.id, data);
+        console.log(`Added to Roster: ${data.name} (Total: ${this.roster.size})`);
+    }
 
-        // Clone data to avoid reference issues
-        const data = {
+    _createData(adventurer) {
+        return {
             id: adventurer.id,
             name: adventurer.name,
             classId: adventurer.classId,
+            race: adventurer.race || 'human',
             stats: { ...adventurer.stats },
             traits: [...adventurer.traits],
-            history: adventurer.history || []
+            visuals: adventurer.visuals ? [...adventurer.visuals] : [],
+            history: adventurer.history || [],
+            isGuildMember: adventurer.isGuildMember || false,
+            injuries: adventurer.injuries || []
         };
+    }
+
+    saveAdventurer(adventurer, report) {
+        if (!adventurer || !adventurer.id) return;
+
+        // Get existing logic or create new
+        let data = this.roster.get(adventurer.id);
+        if (!data) {
+            data = this._createData(adventurer);
+        } else {
+            // Sync stats/traits
+            data.stats = { ...adventurer.stats };
+            data.traits = [...adventurer.traits];
+            data.isGuildMember = adventurer.isGuildMember;
+            data.injuries = adventurer.injuries || [];
+        }
 
         // Update based on Result
         data.history.push({
@@ -74,19 +99,28 @@ class PersistenceManager {
         console.log(`Saved Adventurer: ${data.name} (Roster Size: ${this.roster.size})`);
     }
 
+    setAssigned(id, status) {
+        const data = this.roster.get(id);
+        if (data) data.isAssigned = status;
+    }
+
+    resetDailyState() {
+        this.roster.forEach(member => {
+            member.isAssigned = false;
+        });
+        console.log("Daily Roster State Reset (isAssigned = false)");
+    }
+
     getReturningAdventurer() {
         if (this.roster.size === 0) return null;
 
-        // 30% chance to return someone? OR logic handled by caller?
-        // Let's just return a random one if asked.
-        const keys = Array.from(this.roster.keys());
-        const randomKey = keys[Math.floor(Math.random() * keys.length)];
-        const data = this.roster.get(randomKey);
+        // Filter: Must be alive and NOT assigned
+        const candidates = Array.from(this.roster.values()).filter(m => !m.isDead && !m.isAssigned);
 
-        // Don't return if they "Died" (we haven't implemented death yet, but if HP <= 0?)
-        if (data.stats.currentHp <= 0) return null; // Assume dead
+        if (candidates.length === 0) return null;
 
-        return data; // Return the raw data to be fed into Adventurer constructor
+        const data = candidates[Math.floor(Math.random() * candidates.length)];
+        return data;
     }
 }
 

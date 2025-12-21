@@ -7,7 +7,7 @@
 window.GameSystems = window.GameSystems || {};
 
 class EconomyManager {
-    constructor(initialGold = 100) {
+    constructor(initialGold = 50) {
         this.gold = initialGold;
         this.reputation = 10;
         this.dailyExpense = 20; // Rent/Upkeep

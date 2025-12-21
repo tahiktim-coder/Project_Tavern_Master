@@ -53,21 +53,26 @@ class InputController {
         // CHECK RIGHT CLICK (Inspection) OR Shift-Click
         if (e.button === 2 || e.shiftKey) {
             // Inspect Adventurer?
+            // Portrait is centered at height/2 - 50
             const centerX = this.canvas.width / 2;
-            const centerY = this.canvas.height / 2;
-            const dist = Math.sqrt(Math.pow(pos.x - centerX, 2) + Math.pow(pos.y - centerY, 2));
+            const centerY = this.canvas.height / 2 - 100; // Shifted up to match visual
 
-            if (dist < 100 && this.gameState.currentAdventurer) {
-                // Toggle Inspection
-                if (this.gameState.inspectionData) {
-                    this.gameState.inspectionData = null;
-                } else {
-                    if (window.GameSystems.Inspector && this.gameState.inspector) {
-                        this.gameState.inspectionData = this.gameState.inspector.inspect(this.gameState.currentAdventurer);
+            // Box check matches portrait size (approx 240x240)
+            const halfSize = 120;
+            if (pos.x >= centerX - halfSize && pos.x <= centerX + halfSize &&
+                pos.y >= centerY - halfSize && pos.y <= centerY + halfSize) {
+
+                if (this.gameState.currentAdventurer) {
+                    if (this.gameState.inspectionData) {
+                        this.gameState.inspectionData = null;
+                    } else {
+                        if (window.GameSystems.Inspector && this.gameState.inspector) {
+                            this.gameState.inspectionData = this.gameState.inspector.inspect(this.gameState.currentAdventurer);
+                        }
                     }
+                    e.preventDefault();
+                    return;
                 }
-                e.preventDefault();
-                return;
             }
         }
 
@@ -86,6 +91,13 @@ class InputController {
             return;
         }
 
+        // CHECK 0.4: Roster Button (Top Left - Under Day)
+        if (pos.x >= 10 && pos.x <= 190 && pos.y >= 95 && pos.y <= 145) {
+            const event = new CustomEvent('toggleRoster');
+            document.dispatchEvent(event);
+            return;
+        }
+
         // CHECK 0.5: End Day Button? (Top Right - Hanging Sign)
         // New Renderer: x=860, y=30, w=130, h=50
         if (pos.x >= 860 && pos.x <= 990 && pos.y >= 30 && pos.y <= 80) {
@@ -94,19 +106,55 @@ class InputController {
             return;
         }
 
-        // CHECK 0.7: Dismiss Button? (Bottom Center - Stone Plaque)
-        // New Renderer: x=412, y=620, w=200, h=60
-        if (pos.x >= 412 && pos.x <= 612 && pos.y >= 620 && pos.y <= 680) {
-            // VISUAL: Trigger DISMISS Stamp
-            this.gameState.stamp = { type: 'DISMISSED', val: 0 };
+        // CHECK 0.7: Action Buttons (Bottom Center)
+        // Exact Match to Visuals: y=[560, 620]
+        if (pos.y >= 560 && pos.y <= 620) {
+            console.log("Input: Bottom Area Click at", pos.x);
 
-            // Delay next adventurer
-            setTimeout(() => {
-                this.gameState.stamp = null;
-                const event = new CustomEvent('nextAdventurer');
-                document.dispatchEvent(event);
-            }, 800);
-            return;
+            // RECRUIT: Visual [302, 502]
+            if (pos.x >= 302 && pos.x <= 502) {
+                console.log("Input: Recruit Click Detected");
+
+                // Check Cap (User Request: Max 2)
+                if (this.gameState.persistence && this.gameState.persistence.roster.size >= 2) {
+                    alert("Guild Hall is full! (Max 2 Members)\nUpgrade Guild Hall to hire more.");
+                    return;
+                }
+
+                // Check if already hired
+                if (this.gameState.currentAdventurer && this.gameState.currentAdventurer.isGuildMember) {
+                    console.log("Input: Already hired.");
+                    return; // Do nothing or show feedback
+                }
+
+                if (this.gameState.economy && this.gameState.economy.gold >= 100) {
+                    const event = new CustomEvent('recruitAdventurer');
+                    document.dispatchEvent(event);
+                } else {
+                    alert("Not enough gold! Need 100 G.");
+                }
+                return;
+            }
+
+            // DISMISS: Visual [522, 722]
+            if (pos.x >= 522 && pos.x <= 722) {
+                // Only allow dismiss if quests exist
+                if (this.gameState.quests && this.gameState.quests.length > 0) {
+                    console.log("Input: Dismiss Click Detected");
+                    // VISUAL: Trigger DISMISS Stamp
+                    this.gameState.stamp = { type: 'DISMISSED', val: 0 };
+
+                    // Delay next adventurer
+                    setTimeout(() => {
+                        this.gameState.stamp = null;
+                        const event = new CustomEvent('nextAdventurer');
+                        document.dispatchEvent(event);
+                    }, 800);
+                } else {
+                    console.log("Input: Dismiss Disabled (No Quests)");
+                }
+                return;
+            }
         }
 
         // CHECK 1: Clicked on a Quest on the Board?
@@ -179,10 +227,12 @@ class InputController {
         const centerY = this.canvas.height / 2;
 
         // Rectangular Hitbox for reliability
-        const hitX = centerX - 100;
-        const hitY = centerY - 150;
-        const hitW = 200;
-        const hitH = 300;
+        // Center of Visual is h/2 - 100
+        const zoneCenterY = centerY - 100;
+        const hitX = centerX - 120; // Match Portrait Width (240)
+        const hitY = zoneCenterY - 120; // Match Portrait Height (240)
+        const hitW = 240;
+        const hitH = 240;
 
         console.log("Input: Checking drop zone. Mouse:", pos.x, pos.y, "Zone:", hitX, hitY, hitW, hitH);
 
@@ -213,6 +263,19 @@ class InputController {
             console.log("Input: No current adventurer, aborting");
             return;
         }
+        if (this.gameState.currentAdventurer.isAssigned) {
+            console.log("Input: Adventurer already assigned (busy), aborting");
+            return;
+        }
+
+        // Mark as busy immediately to prevent double-assignment
+        this.gameState.currentAdventurer.isAssigned = true;
+
+        // UPDATE PERSISTENCE
+        if (this.gameState.persistence && this.gameState.currentAdventurer.id) {
+            this.gameState.persistence.setAssigned(this.gameState.currentAdventurer.id, true);
+        }
+
         console.log("Input: Current adventurer exists:", this.gameState.currentAdventurer.name);
 
         // Remove quest from available list

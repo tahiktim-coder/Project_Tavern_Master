@@ -127,6 +127,10 @@
                 };
 
                 const traits = [...charClass.traits];
+
+                // Pick race based on class
+                const race = this.pickRaceForClass(charClass.id);
+
                 const equipment = { mainHand: "Basic Weapon", armor: "Basic Armor" };
                 const names = ["Garrett", "Lyra", "Thorn", "Elara", "Ragnar", "Sylas"];
                 const name = names[Math.floor(Math.random() * names.length)] + " the " + charClass.name;
@@ -135,10 +139,50 @@
                     name: name,
                     archetype: archetypeKey,
                     classId: charClass.id,
+                    race: race, // NEW: Add race
                     stats: stats,
                     traits: traits,
                     equipment: equipment
                 });
+            }
+
+            static pickRaceForClass(classId) {
+                // Map to maximize portrait usage - group similar classes
+                const raceMap = {
+                    // MARTIAL - Use human_warrior or orc_barbarian
+                    warrior: 'human',  // human_warrior.png
+                    knight: 'human',   // human_warrior.png
+                    pit_fighter: 'human', // human_warrior.png
+                    mercenary: 'human', // human_warrior.png
+                    ronin: 'human',    // human_warrior.png
+                    guard: 'human',    // human_warrior.png  
+                    barbarian: 'orc',  // orc_barbarian.png (always orc now)
+
+                    // ARCANE - Use elf_mage or human_necromancer
+                    battle_mage: 'elf',    // elf_mage.png
+                    scholar: 'elf',        // elf_mage.png
+                    illusionist: 'elf',    // elf_mage.png
+                    elementalist: 'elf',   // elf_mage.png
+                    hedge_wizard: 'elf',   // elf_mage.png
+                    necromancer: 'human',  // human_necromancer.png
+                    cultist: 'human',      // human_necromancer.png
+
+                    // CUNNING - Use human_rogue or elf_ranger
+                    rogue: 'human',        // human_rogue.png
+                    assassin: 'human',     // human_rogue.png
+                    spy: 'human',          // human_rogue.png
+                    treasure_hunter: 'human', // human_rogue.png
+                    bard: 'human',         // human_rogue.png (close enough)
+                    ranger: 'elf',         // elf_ranger.png
+
+                    // DIVINE - Use human_cleric or dwarf_paladin
+                    cleric: 'human',   // human_cleric.png
+                    monk: 'human',     // human_cleric.png (both holy)
+                    druid: 'elf',      // elf_ranger.png (nature themed)
+                    paladin: 'dwarf'   // dwarf_paladin.png
+                };
+
+                return raceMap[classId] || 'human';
             }
 
             static randomRange(min, max) {
@@ -153,6 +197,7 @@
                 this.width = canvas.width;
                 this.height = canvas.height;
                 this.assets = {};
+                this.portraits = {}; // NEW: Cache for character portraits
                 this.isLoaded = false;
             }
 
@@ -192,109 +237,205 @@
                 } else if (gameState.screen === 'GAME') {
                     this.drawGameScreen(gameState);
                 } else if (gameState.screen === 'REPORT') {
-                    this.drawMorningReport(gameState);
+                    this.drawMorningReportV2(gameState);
+                } else if (gameState.screen === 'ROSTER') {
+                    this.drawRosterScreen(gameState);
                 }
             }
 
-            drawMorningReport(gameState) {
-                // 1. Background (Wooden Table)
-                this.ctx.fillStyle = "#3d2817"; // Dark wood
+            drawMorningReportV2(gameState) {
+                // 1. Background (Darkened Tavern)
+                this.ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
                 this.ctx.fillRect(0, 0, this.width, this.height);
-                // Wood grain lines (simple)
-                this.ctx.fillStyle = "#4a321e";
-                for (let i = 0; i < this.height; i += 40) {
-                    this.ctx.fillRect(0, i, this.width, 2);
-                }
 
-                // 2. The Ledger (Open Book)
-                const bookW = 800;
-                const bookH = 600;
-                const bx = (this.width - bookW) / 2;
-                const by = (this.height - bookH) / 2;
+                // 2. The Ledger (Large Scroll)
+                const sheetW = 900;
+                const sheetH = 680;
+                const bx = (this.width - sheetW) / 2;
+                const by = (this.height - sheetH) / 2;
 
-                // Cover (Leather)
-                this.ctx.fillStyle = "#2a1a10";
-                this.ctx.fillRect(bx - 20, by - 20, bookW + 40, bookH + 40);
+                // Paper Background
+                this.ctx.fillStyle = "#f5e6d3";
+                this.ctx.fillRect(bx, by, sheetW, sheetH);
 
-                // Pages
-                this.ctx.fillStyle = "#f5e6d3"; // Parchment
-                this.ctx.fillRect(bx, by, bookW / 2 - 5, bookH); // Left Page
-                this.ctx.fillRect(bx + bookW / 2 + 5, by, bookW / 2 - 5, bookH); // Right Page
+                // Border
+                this.ctx.strokeStyle = "#4a321e";
+                this.ctx.lineWidth = 10;
+                this.ctx.strokeRect(bx, by, sheetW, sheetH);
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(bx + 15, by + 15, sheetW - 30, sheetH - 30);
 
-                // Spine Shadow
-                this.ctx.fillStyle = "rgba(0,0,0,0.2)";
-                this.ctx.fillRect(bx + bookW / 2 - 20, by, 40, bookH);
-
-                // 3. Text Content
-                this.ctx.fillStyle = "#3e2723"; // Ink
-                this.ctx.font = "bold 32px 'MedievalSharp', cursive";
+                // 3. Header
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.font = "bold 40px 'MedievalSharp', cursive";
                 this.ctx.textAlign = "center";
-                this.ctx.fillText("Guild Daily Ledger", bx + bookW / 4, by + 60);
-                this.ctx.fillText("Day " + gameState.day, bx + bookW * 0.75, by + 60);
+                this.ctx.fillText("Guild Daily Ledger", this.width / 2, by + 60);
 
-                // Separator Lines
-                this.ctx.fillRect(bx + 40, by + 80, bookW / 2 - 80, 2);
-                this.ctx.fillRect(bx + bookW / 2 + 40, by + 80, bookW / 2 - 80, 2);
+                this.ctx.font = "26px 'MedievalSharp', cursive";
+                this.ctx.fillText("Day " + gameState.day, this.width / 2, by + 95);
 
-                // Entries (Render on Left Page first, then spill to Right)
-                this.ctx.font = "16px 'MedievalSharp', cursive";
-                this.ctx.textAlign = "left";
+                // Divider
+                this.ctx.beginPath();
+                this.ctx.moveTo(bx + 100, by + 110);
+                this.ctx.lineTo(bx + sheetW - 100, by + 110);
+                this.ctx.lineWidth = 4;
+                this.ctx.stroke();
 
-                let cx = bx + 40;
-                let cy = by + 120;
-                let pageSwap = false;
+                // 4. Entries
+                let cy = by + 140;
+                const startX = bx + 80;
 
                 if (gameState.pendingReports && gameState.pendingReports.length > 0) {
+                    const count = gameState.pendingReports.length;
+                    // Dynamic Row Height Logic
+                    // Available height: 410px (Reduced to fit footer). Min 55, Max 85.
+                    const availableH = 410;
+                    const rowHeight = Math.max(55, Math.min(85, availableH / count));
+
                     gameState.pendingReports.forEach((report, idx) => {
-                        // Check for page overflow/switch
-                        if (cy > by + bookH - 100 && !pageSwap) {
-                            pageSwap = true;
-                            cx = bx + bookW / 2 + 40;
-                            cy = by + 120;
+                        const hero = report.adventurer || {};
+
+                        // Alternating Background Strip
+                        if (idx % 2 === 0) {
+                            this.ctx.fillStyle = "rgba(139, 69, 19, 0.05)"; // Very faint brown
+                            this.ctx.fillRect(bx + 20, cy - rowHeight / 2 + 10, sheetW - 40, rowHeight);
                         }
 
-                        // Colors for stamps/marks
-                        const markColor = report.result === "SUCCESS" ? "#2e7d32" : (report.result === "FAILURE" ? "#c62828" : "#ef6c00");
+                        // Icons & Colors
+                        let icon = "❓";
+                        let color = "#333";
+                        let statusText = report.result;
 
-                        // Entry Header
-                        this.ctx.fillStyle = markColor;
-                        this.ctx.font = "bold 16px 'MedievalSharp', cursive";
-                        const resultMark = report.result === "SUCCESS" ? "[✔]" : (report.result === "FAILURE" ? "[✖]" : "[?]");
-                        this.ctx.fillText(`${resultMark} ${report.questTitle}`, cx, cy);
+                        if (report.result === "SUCCESS") {
+                            icon = "✔"; color = "#2e7d32";
 
-                        // Adventurer Name
+                        } else if (hero.isDead) { // DEATH Check
+                            icon = "💀"; color = "#b71c1c"; statusText = "KILLED";
+                        } else if (hero.injuries && hero.injuries.length > 0) {
+                            icon = "⚠"; color = "#e65100"; statusText = "INJURED";
+                        } else if (report.result === "FAILURE") {
+                            icon = "✖"; color = "#c62828";
+                        } else if (report.result === "MIXED") {
+                            icon = "−"; color = "#f57c00"; statusText = "Mixed";
+                        }
+
+                        // A. Icon
+                        this.ctx.textAlign = "center";
+                        this.ctx.font = `bold ${Math.min(30, rowHeight / 2)}px monospace`;
+                        this.ctx.fillStyle = color;
+                        this.ctx.fillText(icon, startX, cy + 8);
+
+                        // B. Quest & Status
+                        this.ctx.textAlign = "left";
+                        this.ctx.font = "bold 20px 'MedievalSharp', cursive"; // Slightly smaller
+                        this.ctx.fillText(`[${statusText}] ${report.questTitle}`, startX + 50, cy);
+
+                        // C. Hero Name
+                        this.ctx.font = "italic 16px 'MedievalSharp', cursive";
                         this.ctx.fillStyle = "#5d4037";
-                        this.ctx.font = "italic 14px 'MedievalSharp', cursive";
-                        this.ctx.fillText(`   Assigned: ${report.adventurerName}`, cx, cy + 20);
+                        this.ctx.fillText(report.adventurerName, startX + 60, cy + 20);
 
-                        // Outcome/Flavor
+                        // D. Flavor/Consequence
+                        this.ctx.font = "13px 'MedievalSharp', cursive";
                         this.ctx.fillStyle = "#3e2723";
-                        this.ctx.font = "14px 'MedievalSharp', cursive";
-                        // Wrap text roughly
-                        let desc = "> " + report.flavorText;
-                        if (desc.length > 40) {
-                            this.ctx.fillText(desc.substring(0, 40) + "...", cx, cy + 40);
-                        } else {
-                            this.ctx.fillText(desc, cx, cy + 40);
+                        let flavor = report.flavorText || "";
+                        if (hero.isDead) flavor = "✝ " + flavor;
+                        else if (hero.injuries && hero.injuries.length > 0) {
+                            const inj = hero.injuries[hero.injuries.length - 1];
+                            const dur = inj.duration === -1 ? 'Permanent' : inj.duration + 'd';
+                            flavor = `⚠ ${inj.name} (${dur}) - ${flavor}`;
                         }
+                        // Truncate based on width
+                        if (flavor.length > 75) flavor = flavor.substring(0, 72) + "...";
+                        this.ctx.fillText(flavor, startX + 60, cy + 36);
 
-                        cy += 70; // Spacing per entry
+                        // E. Gold
+                        const gold = report.goldEarned || 0;
+                        this.ctx.textAlign = "right";
+                        this.ctx.font = "bold 22px 'MedievalSharp', cursive";
+                        this.ctx.fillStyle = gold > 0 ? "#f9a825" : "#9e9e9e";
+                        this.ctx.fillText(gold > 0 ? `+${gold} G` : "0 G", bx + sheetW - 80, cy + 5);
+
+                        cy += rowHeight;
                     });
                 } else {
                     this.ctx.fillStyle = "#8d6e63";
-                    this.ctx.fillText("No guild activity recorded.", cx, cy);
+                    this.ctx.fillText("No guild activity recorded.", this.width / 2, cy + 50);
                 }
 
-                // 4. Continue Prompt (Bookmark?)
-                this.ctx.fillStyle = "#8b0000";
-                this.ctx.fillRect(bx + bookW - 60, by + bookH, 40, 60); // Bookmark sticking out
+                // TOTALS Calculation
+                let totalGold = 0;
+                if (gameState.pendingReports) {
+                    gameState.pendingReports.forEach(r => totalGold += (r.goldEarned || 0));
+                }
+                const upkeep = gameState.lastUpkeep ? gameState.lastUpkeep.paid : 0;
+                const net = totalGold - upkeep;
 
-                this.ctx.fillStyle = "white";
-                this.ctx.font = "bold 16px monospace";
+                // Footer Area
+                const footerY = by + sheetH - 150; // Moved UP significantly to avoid Button overlap
+
+                // Line Separation
+                this.ctx.beginPath();
+                this.ctx.moveTo(bx + 50, footerY);
+                this.ctx.lineTo(bx + sheetW - 50, footerY);
+                this.ctx.strokeStyle = "#4a321e";
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // Financial Summary
+                this.ctx.textAlign = "right";
+                const valX = bx + sheetW - 100;
+                const labX = valX - 120;
+                let fy = footerY + 30;
+
+                // 1. Gross
+                this.ctx.font = "20px monospace";
+                this.ctx.fillStyle = "#5d4037"; // Brown
+                this.ctx.fillText("Gross Revenue:", labX, fy);
+                this.ctx.fillStyle = "#2e7d32"; // Green
+                this.ctx.fillText(`+${totalGold} G`, valX, fy);
+
+                // 2. Upkeep
+                fy += 25;
+                this.ctx.fillStyle = "#5d4037";
+                this.ctx.fillText("Daily Upkeep:", labX, fy);
+                this.ctx.fillStyle = "#c62828"; // Red
+                this.ctx.fillText(`-${upkeep} G`, valX, fy);
+
+                // 3. Net
+                fy += 35;
+                this.ctx.font = "bold 28px 'MedievalSharp', cursive";
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.fillText("Net Profit:", labX, fy);
+                this.ctx.fillStyle = net >= 0 ? "#FFD700" : "#d32f2f";
+                this.ctx.fillText(`${net >= 0 ? '+' : ''}${net} G`, valX, fy);
+
+                // BUTTON
+                // Centered button at bottom
+                const btnW = 220;
+                const btnH = 60;
+                const btnX = this.width / 2 - btnW / 2;
+                const btnY = by + sheetH - 40; // Overlaps bottom edge slightly for effect
+
+                // Button Shadow
+                this.ctx.fillStyle = "rgba(0,0,0,0.4)";
+                this.ctx.fillRect(btnX + 5, btnY + 5, btnW, btnH);
+
+                // Button Body
+                this.ctx.fillStyle = "#b71c1c"; // Red wax
+                this.ctx.fillRect(btnX, btnY, btnW, btnH);
+                this.ctx.strokeStyle = "#e53935";
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+                this.ctx.fillStyle = "#fff";
+                this.ctx.font = "bold 24px 'MedievalSharp', cursive";
                 this.ctx.textAlign = "center";
-                this.ctx.fillText("NEXT", bx + bookW - 40, by + bookH + 35);
-                this.ctx.font = "12px monospace";
-                this.ctx.fillText("(SPC)", bx + bookW - 40, by + bookH + 50);
+                this.ctx.fillText("NEXT DAY", this.width / 2, btnY + 35);
+
+                this.ctx.font = "16px monospace";
+                this.ctx.fillStyle = "#ffcdd2";
+                this.ctx.fillText("(Press SPACE)", this.width / 2, btnY + 80);
             }
 
             drawStartScreen() {
@@ -325,6 +466,220 @@
                 this.ctx.fillText("[Press SPACE or Click]", this.width / 2, this.height / 2 + 150);
             }
 
+            drawRosterScreen(gameState) {
+                // Background (Dark Overlay)
+                this.ctx.fillStyle = "rgba(20, 10, 5, 0.95)";
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Border
+                this.ctx.strokeStyle = "#FFD700";
+                this.ctx.lineWidth = 4;
+                this.ctx.strokeRect(50, 50, this.width - 100, this.height - 100);
+
+                // Header
+                this.ctx.fillStyle = "#FFD700";
+                this.ctx.font = "bold 50px 'MedievalSharp', cursive";
+                this.ctx.textAlign = "center";
+                this.ctx.shadowColor = "black";
+                this.ctx.shadowBlur = 10;
+                this.ctx.fillText("Guild Roster", this.width / 2, 110);
+                this.ctx.shadowBlur = 0;
+
+                // Scrollable List area (simplified for now as just a list)
+                this.ctx.font = "24px 'MedievalSharp', cursive";
+                this.ctx.textAlign = "left";
+
+                // Get Roster
+                const members = gameState.persistence ? gameState.persistence.roster : [];
+
+                if (!members || members.length === 0) {
+                    this.ctx.fillStyle = "#8d6e63";
+                    this.ctx.textAlign = "center";
+                    this.ctx.fillText("The guild has no members yet.", this.width / 2, this.height / 2);
+                } else {
+                    let y = 180;
+                    const xName = 150;
+                    const xClass = 450;
+                    const xStatus = 750;
+
+                    // Table Headers
+                    this.ctx.fillStyle = "#FFB74D";
+                    this.ctx.fillText("Name", xName, 150);
+                    this.ctx.fillText("Class (Lvl)", xClass, 150);
+                    this.ctx.fillText("Status", xStatus, 150);
+
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(100, 160);
+                    this.ctx.lineTo(this.width - 100, 160);
+                    this.ctx.strokeStyle = "#5d4037";
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+
+                    // Entries
+                    members.forEach((m, idx) => {
+                        if (y > this.height - 100) return; // Clip
+
+                        // Alternate rows
+                        if (idx % 2 === 0) {
+                            this.ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+                            this.ctx.fillRect(60, y - 25, this.width - 120, 35);
+                        }
+
+                        this.ctx.fillStyle = "#e0e0e0";
+                        this.ctx.fillText(m.name, xName, y);
+                        this.ctx.fillText(`${m.class} (${m.level})`, xClass, y);
+
+                        // Status Color
+                        let status = "Ready";
+                        let color = "#4caf50"; // Green
+
+                        if (m.isDead) { status = "Accident"; color = "red"; }
+                        else if (m.injuries && m.injuries.length > 0) {
+                            const inj = m.injuries[0]; // Get first injury
+                            const dur = (inj && inj.duration !== undefined) ? inj.duration + "d" : "?";
+                            status = "Injured (" + dur + ")";
+                            color = "#ff9800"; // Orange
+                        } else if (m.isAssigned) {
+                            status = "On Quest";
+                            color = "#2196f3"; // Blue
+                        }
+
+                        this.ctx.fillStyle = color;
+                        this.ctx.fillText(status, xStatus, y);
+                        y += 40;
+                    });
+                }
+
+                // Footer
+                if (!gameState.rosterDetailMember) {
+                    this.ctx.fillStyle = "#888";
+                    this.ctx.font = "16px monospace";
+                    this.ctx.textAlign = "center";
+                    this.ctx.fillText("[Click a member to manage]", this.width / 2, this.height - 20);
+                }
+
+                // Draw Detail Modal if active
+                if (gameState.rosterDetailMember) {
+                    this.drawRosterDetail(gameState.rosterDetailMember);
+                }
+            }
+
+            drawRosterDetail(member) {
+                // Dim background
+                this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Modal Window
+                const w = 600;
+                const h = 550;
+                const x = (this.width - w) / 2;
+                const y = (this.height - h) / 2;
+
+                this.ctx.fillStyle = "#2c1e14"; // dary wood
+                this.ctx.fillRect(x, y, w, h);
+                this.ctx.strokeStyle = "#FFD700";
+                this.ctx.lineWidth = 4;
+                this.ctx.strokeRect(x, y, w, h);
+
+                // Header
+                this.ctx.fillStyle = "#FFD700";
+                this.ctx.font = "bold 36px 'MedievalSharp', cursive";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText(member.name, x + w / 2, y + 50);
+
+                // Portrait (Left)
+                const pSize = 180;
+                const px = x + 40;
+                const py = y + 80;
+                // Draw frame
+                this.ctx.strokeStyle = "#6d4c41";
+                this.ctx.strokeRect(px, py, pSize, pSize);
+                // Draw Image
+                const portrait = this.getPortrait(member);
+                if (portrait) {
+                    this.ctx.drawImage(portrait, px, py, pSize, pSize);
+                }
+
+                // Stats (Right)
+                this.ctx.textAlign = "left";
+                this.ctx.font = "24px monospace";
+                this.ctx.fillStyle = "#fff";
+                let sy = y + 100;
+                const sx = x + 250;
+
+                this.ctx.fillText(`Class: ${member.classId}`, sx, sy); sy += 35;
+                this.ctx.fillText(`Race:  ${member.race}`, sx, sy); sy += 35;
+                sy += 10;
+                this.ctx.fillStyle = "#e0e0e0";
+                this.ctx.fillText(`STR: ${member.stats.str}`, sx, sy); sy += 30;
+                this.ctx.fillText(`DEX: ${member.stats.dex}`, sx, sy); sy += 30;
+                this.ctx.fillText(`INT: ${member.stats.int}`, sx, sy); sy += 30;
+                this.ctx.fillText(`VIT: ${member.stats.vit}`, sx, sy); sy += 30;
+
+                // Injuries / Traits
+                // VISUALS (Inspection Data)
+                sy = y + 290;
+
+                this.ctx.fillStyle = "#81d4fa"; // Light Blue (Scanner color)
+                this.ctx.font = "bold 16px monospace";
+
+                if (member.visuals && member.visuals.length > 0) {
+                    member.visuals.forEach(tag => {
+                        const text = (window.GameData.VisualTraits && window.GameData.VisualTraits[tag]) ? window.GameData.VisualTraits[tag] : tag;
+                        this.ctx.fillText("> " + text, x + 40, sy);
+                        sy += 25;
+                    });
+                } else {
+                    this.ctx.fillText("> Standard appearance.", x + 40, sy);
+                    sy += 25;
+                }
+
+                // Traits
+                sy += 10;
+                this.ctx.fillStyle = "#FFB74D";
+                this.ctx.font = "bold 20px 'MedievalSharp', cursive";
+                this.ctx.fillText("Traits: " + member.traits.join(", "), x + 40, sy);
+
+                sy += 30;
+                if (member.injuries && member.injuries.length > 0) {
+                    this.ctx.fillStyle = "#ff5252";
+                    const inj = member.injuries[0];
+                    this.ctx.fillText(`INJURY: ${inj.name} (-${inj.duration}d)`, x + 40, sy);
+                } else {
+                    this.ctx.fillStyle = "#66bb6a";
+                    this.ctx.fillText("Condition: Healthy", x + 40, sy);
+                }
+
+                // ACTIONS
+                const btnY = y + h - 80;
+
+                // HEAL BUTTON (Only if injured)
+                if (member.injuries && member.injuries.length > 0) {
+                    const healPrice = 50;
+                    this.ctx.fillStyle = "#2e7d32";
+                    this.ctx.fillRect(x + 40, btnY, 160, 50);
+                    this.ctx.fillStyle = "#fff";
+                    this.ctx.textAlign = "center";
+                    this.ctx.font = "bold 18px monospace";
+                    this.ctx.fillText(`TREAT (-${healPrice}G)`, x + 120, btnY + 30);
+                    // Hitbox: x+40, btnY, 160, 50
+                }
+
+                // FIRE BUTTON
+                this.ctx.fillStyle = "#c62828";
+                this.ctx.fillRect(x + w - 180, btnY, 140, 50);
+                this.ctx.fillStyle = "#fff";
+                this.ctx.textAlign = "center";
+                this.ctx.font = "bold 18px monospace";
+                this.ctx.fillText("FIRE", x + w - 110, btnY + 30);
+
+                // CLOSE BUTTON (Top Right)
+                this.ctx.fillStyle = "#b71c1c";
+                this.ctx.fillRect(x + w - 40, y, 40, 40);
+                this.ctx.fillStyle = "#fff";
+                this.ctx.fillText("X", x + w - 20, y + 28);
+            }
+
             drawGameScreen(gameState) {
                 // Draw Quests on Board
                 if (gameState.quests) {
@@ -337,14 +692,42 @@
                     this.drawAdventurerPlaceholder(hero);
                 }
 
-                // UI: Gold & Day
-                this.ctx.fillStyle = "#FFD700";
-                this.ctx.font = "bold 24px monospace";
-                this.ctx.textAlign = "left";
-                this.ctx.fillText(`Gold: ${gameState.economy.gold}`, 20, 40);
+                // UI: Gold & Day - WITH PROPER BACKGROUNDS
+                // Dark panel background for contrast
+                this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                this.ctx.fillRect(10, 10, 180, 75);
 
-                this.ctx.fillStyle = "white";
-                this.ctx.fillText(`Day: ${gameState.day}`, 20, 70);
+                // Gold border accent
+                this.ctx.strokeStyle = "#FFD700";
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(10, 10, 180, 75);
+
+                // Gold text
+                this.ctx.fillStyle = "#FFD700";
+                this.ctx.font = "bold 22px monospace";
+                this.ctx.textAlign = "left";
+                this.ctx.fillText(`Gold: ${gameState.economy.gold} `, 20, 38);
+
+                // Day text
+                this.ctx.fillStyle = "#FFFFFF";
+                this.ctx.fillText(`Day: ${gameState.day} `, 20, 68);
+
+                // UI: Guild Roster Button
+                const rosterBtnX = 10;
+                const rosterBtnY = 95;
+                const rosterBtnW = 180;
+                const rosterBtnH = 50;
+
+                this.ctx.fillStyle = "#4a321e"; // Wood
+                this.ctx.fillRect(rosterBtnX, rosterBtnY, rosterBtnW, rosterBtnH);
+                this.ctx.strokeStyle = "#8d6e63"; // Lighter wood border
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(rosterBtnX, rosterBtnY, rosterBtnW, rosterBtnH);
+
+                this.ctx.fillStyle = "#f5f5f5";
+                this.ctx.font = "bold 18px 'MedievalSharp', cursive";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText("GUILD ROSTER", rosterBtnX + rosterBtnW / 2, rosterBtnY + 32);
 
                 // UI: End Day (Hanging Sign Top Right)
                 // Draw Rope
@@ -368,27 +751,62 @@
                 this.ctx.fillText("END DAY", 925, 62);
 
 
-                // UI: Dismiss Area (Bottom Right - "The Door")
-                // Instead of a button, an area to drag to? Or just a clickable "Exit" sign?
-                // Let's make it a robust Stone Button/Plaque at the bottom
-                const btnX = 412;
-                const btnY = 620;
-                const btnW = 200;
-                const btnH = 60;
+                // UI: Action Buttons (Bottom Center Area)
+                // MOVED UP for better visibility
 
-                // Stone Texture
-                this.ctx.fillStyle = "#546e7a";
-                this.ctx.fillRect(btnX, btnY, btnW, btnH);
+                // 1. RECRUIT BUTTON (Left)
+                const recruitX = 302;
+                const recruitY = 560; // Moved up from 620
+                const recruitW = 200;
+                const recruitH = 60;
+
+                // Draw Recruit Button
+                this.ctx.fillStyle = "#2e7d32"; // Green
+                this.ctx.fillRect(recruitX, recruitY, recruitW, recruitH);
 
                 // Bevel
-                this.ctx.fillStyle = "#78909c";
-                this.ctx.fillRect(btnX, btnY, btnW, 4); // Top highlight
-                this.ctx.fillStyle = "#37474f";
-                this.ctx.fillRect(btnX, btnY + btnH - 4, btnW, 4); // Bottom shadow
+                this.ctx.fillStyle = "#4caf50";
+                this.ctx.fillRect(recruitX, recruitY, recruitW, 4);
+                this.ctx.fillStyle = "#1b5e20";
+                this.ctx.fillRect(recruitX, recruitY + recruitH - 4, recruitW, 4);
 
-                this.ctx.fillStyle = "#eceff1";
+                this.ctx.fillStyle = "#fff";
+                this.ctx.textAlign = "center";
+                this.ctx.font = "bold 20px 'MedievalSharp', cursive";
+                // Show "HIRED" if already in guild
+                const recruitText = (hero && hero.isGuildMember) ? "HIRED" : "HIRE (100 G)";
+                this.ctx.fillText(recruitText, recruitX + recruitW / 2, recruitY + 38);
+
+                // 2. DISMISS BUTTON (Right)
+                const dismissX = 522;
+                const dismissY = 560; // Moved up from 620
+                const dismissW = 200;
+                const dismissH = 60;
+
+                // Check if we can dismiss (Must have quests?)
+                const canDismiss = gameState.quests && gameState.quests.length > 0;
+
+                if (canDismiss) {
+                    this.ctx.fillStyle = "#546e7a"; // Stone Blue
+                } else {
+                    this.ctx.fillStyle = "#37474f"; // Dark/Disabled
+                }
+                this.ctx.fillRect(dismissX, dismissY, dismissW, dismissH);
+
+                if (canDismiss) {
+                    this.ctx.fillStyle = "#78909c";
+                    this.ctx.fillRect(dismissX, dismissY, dismissW, 4);
+                    this.ctx.fillStyle = "#37474f";
+                    this.ctx.fillRect(dismissX, dismissY + dismissH - 4, dismissW, 4);
+                    this.ctx.fillStyle = "#eceff1";
+                } else {
+                    this.ctx.fillStyle = "#546e7a"; // Dim Text
+                }
+
                 this.ctx.font = "bold 22px 'MedievalSharp', cursive";
-                this.ctx.fillText("DISMISS", btnX + btnW / 2, btnY + 38);
+                this.ctx.fillText("DISMISS", dismissX + dismissW / 2, dismissY + 38);
+
+
 
 
                 // Draw Dragged Item (Floating on top)
@@ -410,6 +828,9 @@
                 if (gameState.stamp) {
                     this.drawStamp(gameState.stamp);
                 }
+
+                // DEBUG OVERLAYS (User Request)
+                this.drawDebugOverlays(gameState);
             }
 
             drawStamp(stamp) {
@@ -426,7 +847,10 @@
                 this.ctx.globalAlpha = alpha;
 
                 // 1. WAX BLOB (Organic Shape)
-                const color = stamp.type === 'ASSIGNED' ? "#8b0000" : "#2f2f2f";
+                let color = "#2f2f2f";
+                if (stamp.type === 'ASSIGNED') color = "#8b0000"; // Red
+                else if (stamp.type === 'HIRED') color = "#2e7d32"; // Green
+
                 this.ctx.fillStyle = color;
 
                 this.ctx.beginPath();
@@ -460,6 +884,14 @@
                     this.ctx.fillStyle = "rgba(0,0,0,0.4)";
                     this.ctx.fillRect(-5, -70, 10, 120);
                     this.ctx.fillRect(-20, -40, 40, 10); // Hilt
+                    this.ctx.fillRect(-5, -70, 10, 120);
+                    this.ctx.fillRect(-20, -40, 40, 10); // Hilt
+                } else if (stamp.type === 'HIRED') {
+                    // Draw Checkmark / H
+                    this.ctx.fillStyle = "rgba(0,0,0,0.3)";
+                    this.ctx.font = "bold 80px 'MedievalSharp', cursive";
+                    this.ctx.textAlign = "center";
+                    this.ctx.fillText("HIRED", 0, 25);
                 } else {
                     // Draw "X" or "Dismiss Hand"
                     this.ctx.beginPath();
@@ -477,6 +909,48 @@
                 // this.ctx.font = "bold 16px MedievalSharp";
                 // this.ctx.textAlign = "center";
                 // this.ctx.fillText(stamp.type, 0, 80); 
+
+                this.ctx.restore();
+            }
+
+            drawDebugOverlays(gameState) {
+                if (gameState.screen !== 'GAME') return;
+
+                this.ctx.save();
+                this.ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
+                this.ctx.lineWidth = 2;
+                this.ctx.font = "12px monospace";
+                this.ctx.fillStyle = "red";
+
+                const drawBox = (x, y, w, h, label) => {
+                    this.ctx.strokeRect(x, y, w, h);
+                    this.ctx.fillText(label, x + 5, y + 15);
+                };
+
+                // 1. Roster Button
+                drawBox(10, 95, 180, 50, "ROSTER");
+
+                // 2. End Day
+                drawBox(860, 30, 130, 50, "END DAY");
+
+                // 3. Recruit (Hitbox)
+                drawBox(302, 560, 200, 60, "RECRUIT");
+
+                // 4. Dismiss (Hitbox)
+                drawBox(522, 560, 200, 60, "DISMISS");
+
+                // 5. Inspection (Center)
+                const cx = this.width / 2;
+                // Visual Center calculated: h/2 - 100
+                const inspectCy = this.height / 2 - 100;
+                drawBox(cx - 120, inspectCy - 120, 240, 240, "INSPECT (R-CLICK)");
+
+                // 6. Quest Drop Zone (Input System Logic)
+                // Center calculated: h/2 - 100
+                this.ctx.strokeStyle = "cyan";
+                this.ctx.fillStyle = "cyan";
+                // Input: hitX = cx - 120, hitY = cy - 120, w=240, h=240
+                drawBox(cx - 120, inspectCy - 120, 240, 240, "DROP ZONE");
 
                 this.ctx.restore();
             }
@@ -677,106 +1151,244 @@
                 this.ctx.restore();
             }
 
+            getPortrait(hero) {
+                if (!hero.race || !hero.classId) return null;
+
+                // Smart portrait mapping based on available files:
+                // dwarf_paladin, elf_mage, elf_ranger, human_cleric, human_necromancer, 
+                // human_rogue, human_warrior, orc_barbarian, orc_barbarian_rusty
+
+                let portraitKey = null;
+
+                // 1. Direct map first
+                const directKey = `${hero.race}_${hero.classId}`;
+
+                // 2. Fallback mapping based on class type
+                if (hero.race === 'human') {
+                    if (['warrior', 'pit_fighter', 'mercenary', 'ronin', 'guard'].includes(hero.classId)) {
+                        portraitKey = 'human_warrior';
+                    } else if (hero.classId === 'knight') {
+                        portraitKey = 'human_knight';
+                    } else if (['rogue', 'spy', 'treasure_hunter'].includes(hero.classId)) {
+                        portraitKey = 'human_rogue';
+                    } else if (['assassin'].includes(hero.classId)) {
+                        portraitKey = 'human_rogue';
+                    } else if (['bard'].includes(hero.classId)) {
+                        portraitKey = 'human_rogue';
+                    } else if (['cleric'].includes(hero.classId)) {
+                        portraitKey = 'human_cleric';
+                    } else if (['monk'].includes(hero.classId)) {
+                        portraitKey = 'human_cleric';
+                    } else if (['necromancer', 'cultist'].includes(hero.classId)) {
+                        portraitKey = 'human_necromancer';
+                    }
+                }
+
+                if (hero.race === 'elf') {
+                    if (['battle_mage', 'scholar', 'illusionist', 'elementalist', 'hedge_wizard'].includes(hero.classId)) {
+                        portraitKey = 'elf_mage';
+                    } else if (['ranger', 'druid'].includes(hero.classId)) {
+                        portraitKey = 'elf_ranger';
+                    }
+                }
+
+                if (hero.race === 'orc' && hero.classId === 'barbarian') {
+                    // Check for rusty variant
+                    if (hero.visuals && hero.visuals.includes('rusty_gear')) {
+                        portraitKey = 'orc_barbarian_rusty';
+                    } else {
+                        portraitKey = 'orc_barbarian';
+                    }
+                }
+
+                if (hero.race === 'dwarf' && hero.classId === 'paladin') {
+                    portraitKey = 'dwarf_paladin';
+                }
+
+                if (!portraitKey) return null;
+
+                // Return cached or create new
+                if (!this.portraits[portraitKey]) {
+                    const img = new Image();
+                    img.src = `assets/portraits/${portraitKey}.png`;
+                    this.portraits[portraitKey] = img;
+                }
+
+                return this.portraits[portraitKey];
+            }
+
             drawAdventurerPlaceholder(hero) {
                 const cx = this.width / 2;
                 const cy = this.height / 2 - 50;
 
-                // 1. BASE SILHOUETTE
-                this.ctx.fillStyle = "rgba(50, 50, 50, 1.0)";
+                // Try to load portrait sprite
+                const portrait = this.getPortrait(hero);
 
-                // Change color/shape based on stats?
-                // For now, keep it dark silhouette but add details
-                if (hero.visuals.includes("scrawny")) {
-                    this.ctx.fillStyle = "rgba(60, 60, 60, 1.0)"; // Lighter/Thinner look notionally
-                }
+                if (portrait && portrait.complete && portrait.naturalWidth > 0) {
+                    // SPRITE-BASED RENDERING
+                    const size = 240; // Portrait size (increased from 220 for better presence)
 
-                this.ctx.beginPath();
-                // If muscles, make wider
-                let width = hero.visuals.includes("muscles") ? 100 : 80;
-                if (hero.visuals.includes("scrawny")) width = 60;
+                    // Add subtle shadow/glow behind portrait for depth
+                    this.ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+                    this.ctx.shadowBlur = 20;
+                    this.ctx.shadowOffsetX = 0;
+                    this.ctx.shadowOffsetY = 10;
 
-                this.ctx.ellipse(cx, cy + 50, width, 180, 0, 0, Math.PI * 2);
-                this.ctx.fill();
+                    // Draw portrait
+                    this.ctx.drawImage(
+                        portrait,
+                        cx - size / 2,
+                        cy - size / 2 - 50, // Slightly higher placement
+                        size,
+                        size
+                    );
 
-                // 2. RENDER VISUAL TELLS (The Clues)
+                    // Guild Member Badge (Top Left of Portrait)
+                    if (hero.isGuildMember) {
+                        const badgeX = cx - size / 2 + 10;
+                        const badgeY = cy - size / 2 - 50 + 10; // Relative to portrait top-left
 
-                // GLOWING EYES
-                if (hero.visuals.includes("glowing_eyes")) {
-                    this.ctx.shadowBlur = 10;
-                    this.ctx.shadowColor = "cyan";
-                    this.ctx.fillStyle = "cyan";
-                    this.ctx.beginPath();
-                    this.ctx.arc(cx - 20, cy - 80, 5, 0, Math.PI * 2); // Left Eye
-                    this.ctx.arc(cx + 20, cy - 80, 5, 0, Math.PI * 2); // Right Eye
-                    this.ctx.fill();
+                        // Badge Background
+                        this.ctx.fillStyle = "#FFD700"; // Gold
+                        this.ctx.strokeStyle = "#fff";
+                        this.ctx.lineWidth = 2;
+                        this.ctx.beginPath();
+                        this.ctx.arc(badgeX + 15, badgeY + 15, 18, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        this.ctx.stroke();
+
+                        // Badge Text
+                        this.ctx.fillStyle = "#000";
+                        this.ctx.font = "bold 20px monospace";
+                        this.ctx.textAlign = "center";
+                        this.ctx.fillText("G", badgeX + 15, badgeY + 22);
+                    }
+
+                    // Reset shadow
                     this.ctx.shadowBlur = 0;
-                }
+                    this.ctx.shadowOffsetX = 0;
+                    this.ctx.shadowOffsetY = 0;
 
-                // JEWELRY (Gold necklace/chain)
-                if (hero.visuals.includes("jewelry")) {
-                    this.ctx.strokeStyle = "gold";
-                    this.ctx.lineWidth = 3;
+                    // Add subtle visual overlays for special traits
+                    if (hero.visuals) {
+                        // BANDAGED (White strips overlays)
+                        if (hero.visuals.includes("bandaged")) {
+                            this.ctx.strokeStyle = "#eee";
+                            this.ctx.lineWidth = 4;
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(cx - 50, cy + 30);
+                            this.ctx.lineTo(cx - 20, cy + 40);
+                            this.ctx.stroke();
+                        }
+
+                        // SHAKING ANIMATION
+                        let offsetX = 0;
+                        if (hero.visuals.includes("shaking")) {
+                            offsetX = (Math.random() - 0.5) * 5; // Jitter
+                        }
+
+                        // Name label with strong outline for visibility
+                        this.ctx.strokeStyle = "black";
+                        this.ctx.lineWidth = 5;
+                        this.ctx.font = "bold 20px 'MedievalSharp', monospace";
+                        this.ctx.textAlign = "center";
+                        this.ctx.strokeText(hero.name, cx + offsetX, cy - 170);
+
+                        this.ctx.fillStyle = "#FFFFFF"; // White text
+                        this.ctx.fillText(hero.name, cx + offsetX, cy - 170);
+                    }
+
+                } else {
+                    // FALLBACK: SILHOUETTE RENDERING (Original code)
+                    this.ctx.fillStyle = "rgba(50, 50, 50, 1.0)";
+
+                    if (hero.visuals && hero.visuals.includes("scrawny")) {
+                        this.ctx.fillStyle = "rgba(60, 60, 60, 1.0)";
+                    }
+
                     this.ctx.beginPath();
-                    this.ctx.arc(cx, cy - 30, 40, 0, Math.PI, false); // Necklace arc
-                    this.ctx.stroke();
-                    // Gem
-                    this.ctx.fillStyle = "red";
-                    this.ctx.beginPath();
-                    this.ctx.arc(cx, cy + 10, 8, 0, Math.PI * 2); // Pendant
+                    let width = 80;
+                    if (hero.visuals) {
+                        if (hero.visuals.includes("muscles")) width = 100;
+                        if (hero.visuals.includes("scrawny")) width = 60;
+                    }
+
+                    this.ctx.ellipse(cx, cy + 50, width, 180, 0, 0, Math.PI * 2);
                     this.ctx.fill();
+
+                    // Visual tells
+                    if (hero.visuals) {
+                        if (hero.visuals.includes("glowing_eyes")) {
+                            this.ctx.shadowBlur = 10;
+                            this.ctx.shadowColor = "cyan";
+                            this.ctx.fillStyle = "cyan";
+                            this.ctx.beginPath();
+                            this.ctx.arc(cx - 20, cy - 80, 5, 0, Math.PI * 2);
+                            this.ctx.arc(cx + 20, cy - 80, 5, 0, Math.PI * 2);
+                            this.ctx.fill();
+                            this.ctx.shadowBlur = 0;
+                        }
+
+                        if (hero.visuals.includes("jewelry")) {
+                            this.ctx.strokeStyle = "gold";
+                            this.ctx.lineWidth = 3;
+                            this.ctx.beginPath();
+                            this.ctx.arc(cx, cy - 30, 40, 0, Math.PI, false);
+                            this.ctx.stroke();
+                            this.ctx.fillStyle = "red";
+                            this.ctx.beginPath();
+                            this.ctx.arc(cx, cy + 10, 8, 0, Math.PI * 2);
+                            this.ctx.fill();
+                        }
+
+                        if (hero.visuals.includes("pristine_armor")) {
+                            this.ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(cx - 30, cy);
+                            this.ctx.lineTo(cx + 30, cy + 20);
+                            this.ctx.lineTo(cx - 30, cy + 40);
+                            this.ctx.fill();
+                        }
+
+                        if (hero.visuals.includes("rusty_gear")) {
+                            this.ctx.fillStyle = "#8b4513";
+                            this.ctx.fillRect(cx - 40, cy + 20, 10, 10);
+                            this.ctx.fillRect(cx + 30, cy + 60, 15, 15);
+                        }
+
+                        if (hero.visuals.includes("bandaged")) {
+                            this.ctx.strokeStyle = "#eee";
+                            this.ctx.lineWidth = 4;
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(cx - 50, cy + 50);
+                            this.ctx.lineTo(cx - 20, cy + 60);
+                            this.ctx.stroke();
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(cx + 20, cy - 100);
+                            this.ctx.lineTo(cx + 50, cy - 90);
+                            this.ctx.stroke();
+                        }
+                    }
+
+                    // Name
+                    let offsetX = 0;
+                    if (hero.visuals && hero.visuals.includes("shaking")) {
+                        offsetX = (Math.random() - 0.5) * 5;
+                    }
+
+                    this.ctx.fillStyle = "#ffffff";
+                    this.ctx.font = "bold 20px 'MedievalSharp', monospace";
+                    this.ctx.textAlign = "center";
+                    this.ctx.shadowColor = "black";
+                    this.ctx.shadowBlur = 4;
+                    this.ctx.fillText(hero.name, cx + offsetX, cy - 150);
+                    this.ctx.shadowBlur = 0;
+
+                    // Question mark
+                    this.ctx.fillStyle = "#FFD700";
+                    this.ctx.font = "bold 48px monospace";
+                    this.ctx.fillText("?", cx, cy + 60);
                 }
-
-                // PRISTINE ARMOR (Shiny)
-                if (hero.visuals.includes("pristine_armor")) {
-                    this.ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(cx - 30, cy);
-                    this.ctx.lineTo(cx + 30, cy + 20);
-                    this.ctx.lineTo(cx - 30, cy + 40);
-                    this.ctx.fill(); // Shine streak
-                }
-
-                // RUSTY GEAR (Brown splotches)
-                if (hero.visuals.includes("rusty_gear")) {
-                    this.ctx.fillStyle = "#8b4513";
-                    this.ctx.fillRect(cx - 40, cy + 20, 10, 10);
-                    this.ctx.fillRect(cx + 30, cy + 60, 15, 15);
-                }
-
-                // BANDAGED (White strips)
-                if (hero.visuals.includes("bandaged")) {
-                    this.ctx.strokeStyle = "#eee";
-                    this.ctx.lineWidth = 4;
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(cx - 50, cy + 50);
-                    this.ctx.lineTo(cx - 20, cy + 60);
-                    this.ctx.stroke(); // Arm bandage
-
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(cx + 20, cy - 100);
-                    this.ctx.lineTo(cx + 50, cy - 90);
-                    this.ctx.stroke(); // Head bandage
-                }
-
-                // 3. SHAKING ANIMATION (Procedural)
-                let offsetX = 0;
-                if (hero.visuals.includes("shaking")) {
-                    offsetX = (Math.random() - 0.5) * 5; // Jitter
-                }
-
-                // Re-draw Name with Jitter
-                this.ctx.fillStyle = "#ffffff";
-                this.ctx.font = "bold 20px 'MedievalSharp', monospace";
-                this.ctx.textAlign = "center";
-                this.ctx.shadowColor = "black";
-                this.ctx.shadowBlur = 4;
-                this.ctx.fillText(hero.name, cx + offsetX, cy - 150);
-                this.ctx.shadowBlur = 0;
-
-                // Question Mark (if mystery, maybe remove this eventually?)
-                this.ctx.fillStyle = "#FFD700";
-                this.ctx.font = "bold 48px monospace";
-                this.ctx.fillText("?", cx, cy + 60);
             }
 
             drawQuestBoard(quests) {
@@ -858,6 +1470,11 @@
             gameState.day++;
             gameState.pendingReports = []; // Clear previous day's reports
 
+            // RESET DAILY ASSIGNMENTS (User Fix)
+            if (gameState.persistence) {
+                gameState.persistence.resetDailyState();
+            }
+
             // Generate Adventurer
             gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
 
@@ -877,7 +1494,7 @@
             await renderer.loadAssets();
 
             // Initialize Systems
-            gameState.economy = new window.GameSystems.EconomyManager(100);
+            gameState.economy = new window.GameSystems.EconomyManager(50);
             gameState.inspector = new window.GameSystems.Inspector();
             gameState.persistence = new window.GameSystems.PersistenceManager(); // NEW
             const input = new window.GameSystems.InputController(canvas, gameState);
@@ -905,15 +1522,62 @@
             document.addEventListener('endDayManual', () => {
                 // Process Upkeep
                 const upkeep = gameState.economy.processDailyUpkeep();
+                gameState.lastUpkeep = upkeep; // Store for report display
                 if (upkeep.bankrupt) {
                     alert("GAME OVER: You ran out of gold!");
                     location.reload();
                     return;
                 }
 
-                // Switch to Report View instead of immediately starting new day
                 gameState.screen = 'REPORT';
                 gameState.reportOpenedAt = Date.now(); // Prevent immediate click-through
+            });
+
+            // Event: Recruit Adventurer (Manual)
+            document.addEventListener('recruitAdventurer', () => {
+                console.log("Event: recruitAdventurer triggered");
+
+                const hero = gameState.currentAdventurer;
+                if (!hero) {
+                    console.error("No adventurer to recruit!");
+                    return;
+                }
+
+                if (hero.isGuildMember) {
+                    console.log("Already a member");
+                    return;
+                }
+
+                // Direct Gold Deduction (Safer)
+                gameState.economy.gold -= 100;
+
+                // Recruit THIS adventurer
+                hero.isGuildMember = true;
+                console.log("Recruited:", hero.name);
+
+                // Visual Feedback
+                gameState.stamp = { type: 'HIRED', val: 0 };
+
+                // Clear stamp after 800ms (same as Assigned)
+                setTimeout(() => {
+                    if (gameState.stamp && gameState.stamp.type === 'HIRED') {
+                        gameState.stamp = null;
+                    }
+                }, 800);
+
+                if (gameState.persistence) {
+                    gameState.persistence.addToRoster(hero);
+                }
+            });
+
+            // Event: Toggle Roster
+            document.addEventListener('toggleRoster', () => {
+                if (gameState.screen === 'GAME') {
+                    gameState.screen = 'ROSTER';
+                    gameState.rosterOpenedAt = Date.now(); // Prevent immediate closing
+                } else if (gameState.screen === 'ROSTER') {
+                    gameState.screen = 'GAME';
+                }
             });
 
             // Input (Keyboard still useful for debug/start)
@@ -922,8 +1586,22 @@
                     if (e.code === 'Space' || e.code === 'Enter') startGame();
                 } else if (gameState.screen === 'GAME') {
                     // if (e.code === 'Space') startNewDay(); // Disable space to skip
+                } else if (gameState.screen === 'ROSTER') {
+                    if (e.code === 'Escape' || e.code === 'Space') gameState.screen = 'GAME';
                 } else if (gameState.screen === 'REPORT') {
                     if (e.code === 'Space') {
+                        // Collect gold from completed quests
+                        if (gameState.pendingReports && gameState.pendingReports.length > 0) {
+                            let totalGold = 0;
+                            gameState.pendingReports.forEach(report => {
+                                totalGold += report.goldEarned || 0;
+                            });
+                            if (totalGold > 0 && gameState.economy) {
+                                gameState.economy.addGold(totalGold);
+                                console.log(`Day complete! Earned ${totalGold} gold from ${gameState.pendingReports.length} quests`);
+                            }
+                        }
+
                         gameState.screen = 'GAME';
                         startNewDay();
                     }
@@ -931,13 +1609,92 @@
             });
 
             // Mouse Click for Start and Report
-            canvas.addEventListener('click', () => {
+            canvas.addEventListener('click', (e) => { // Captured e
                 if (gameState.screen === 'START') startGame();
+                else if (gameState.screen === 'ROSTER') {
+                    if (gameState.rosterOpenedAt && Date.now() - gameState.rosterOpenedAt < 300) return;
+
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    const x = (e.clientX - rect.left) * scaleX;
+                    const y = (e.clientY - rect.top) * scaleY;
+
+                    // A. DETAIL VIEW OPEN
+                    if (gameState.rosterDetailMember) {
+                        const w = 600;
+                        const h = 550;
+                        const modalX = (canvas.width - w) / 2;
+                        const modalY = (canvas.height - h) / 2;
+                        const btnY = modalY + h - 80;
+
+                        // 1. CLOSE (Top Right X)
+                        if (x >= modalX + w - 40 && x <= modalX + w && y >= modalY && y <= modalY + 40) {
+                            gameState.rosterDetailMember = null;
+                            return;
+                        }
+
+                        // 2. HEAL (Left Button)
+                        if (gameState.rosterDetailMember.injuries && gameState.rosterDetailMember.injuries.length > 0) {
+                            if (x >= modalX + 40 && x <= modalX + 200 && y >= btnY && y <= btnY + 50) {
+                                if (gameState.economy.gold >= 50) {
+                                    gameState.economy.gold -= 50;
+                                    gameState.rosterDetailMember.injuries = []; // CURED
+                                    gameState.rosterDetailMember.traits = gameState.rosterDetailMember.traits.filter(t => t !== 'Injured');
+                                    alert(`${gameState.rosterDetailMember.name} has been treated!`);
+                                    gameState.persistence.saveAdventurer(gameState.rosterDetailMember, { result: "TREATED", questTitle: "Infirmary" }); // Save state
+                                } else {
+                                    alert("Not enough gold to treat injury (50G).");
+                                }
+                                return;
+                            }
+                        }
+
+                        // 3. FIRE (Right Button)
+                        if (x >= modalX + w - 180 && x <= modalX + w - 40 && y >= btnY && y <= btnY + 50) {
+                            if (confirm(`Are you sure you want to fire ${gameState.rosterDetailMember.name}?`)) {
+                                gameState.persistence.roster.delete(gameState.rosterDetailMember.id);
+                                gameState.rosterDetailMember = null;
+                            }
+                            return;
+                        }
+
+                        return; // Modal consumes clicks
+                    }
+
+                    // B. LIST VIEW
+                    // Check rows. Y starts 180, height 40 per row approx
+                    const members = gameState.persistence ? Array.from(gameState.persistence.roster.values()) : [];
+                    let rowY = 180;
+                    for (let m of members) {
+                        if (y >= rowY - 25 && y <= rowY + 10) { // Approx hit area based on text drawing
+                            gameState.rosterDetailMember = m;
+                            return;
+                        }
+                        rowY += 40;
+                    }
+
+                    // Click outside -> Close Roster
+                    gameState.screen = 'GAME';
+                }
                 else if (gameState.screen === 'REPORT') {
                     // Prevent click-through: require 300ms delay after report opens
                     if (gameState.reportOpenedAt && Date.now() - gameState.reportOpenedAt < 300) {
                         return; // Ignore click
                     }
+
+                    // Collect gold from completed quests
+                    if (gameState.pendingReports && gameState.pendingReports.length > 0) {
+                        let totalGold = 0;
+                        gameState.pendingReports.forEach(report => {
+                            totalGold += report.goldEarned || 0;
+                        });
+                        if (totalGold > 0 && gameState.economy) {
+                            gameState.economy.addGold(totalGold);
+                            console.log(`Day complete! Earned ${totalGold} gold from ${gameState.pendingReports.length} quests`);
+                        }
+                    }
+
                     gameState.screen = 'GAME';
                     startNewDay();
                 }

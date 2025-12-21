@@ -11,11 +11,20 @@ class Adventurer {
         this.id = Date.now() + Math.random().toString(16).slice(2);
         this.name = data.name;
         this.classId = data.classId;
+        this.race = data.race || 'human'; // NEW: Store race for portraits
 
         // HIDDEN STATS (Player cannot see these directly)
         // HIDDEN STATS (Player cannot see these directly)
         this.stats = data.stats || { str: 5, dex: 5, int: 5, wis: 5, cha: 5, vit: 5 };
         this.traits = data.traits || [];
+
+        // NEW: Injury & Death System
+        this.injuries = data.injuries || []; // Array of injury objects
+        this.isDead = false; // Death flag
+
+        // NEW: Guild Member System
+        this.isGuildMember = data.isGuildMember || false;
+        this.record = data.record || null; // Tracked stats for guild members
 
         // VISUAL TAGS (Player SAYS these)
         // Derived from stats + random traits

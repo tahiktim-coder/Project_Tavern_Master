@@ -59,13 +59,16 @@ class ResolutionManager {
 
         console.log("Resolution: Rule engine complete. Fatal:", fatalResult, "Score:", score);
 
-        // 3. DETERMINE OUTCOME
+        // 3. DETERMINE OUTCOME (with injury/death)
         let result = "UNKNOWN";
         let flavorText = "";
 
+        // Store original match score for failure severity
+        const matchScore = score;
+
         if (fatalResult) {
-            result = "FAILURE"; // Or DEATH if supported later
-            flavorText = log[log.length - 1]; // Use the fatal message
+            result = "FAILURE";
+            flavorText = log[log.length - 1];
         } else {
             // Random Variance (+/- 20)
             score += (Math.random() * 40 - 20);
@@ -78,13 +81,57 @@ class ResolutionManager {
                 flavorText = "They survived, but it was messy. " + (log.length > 0 ? log.join(" ") : "");
             } else {
                 result = "FAILURE";
-                flavorText = "Defeat. " + (log.length > 0 ? log.join(" ") : "They were simply unprepared.");
+
+                // NEW: Determine failure severity and consequences
+                const failureSeverity = this.determineFailureSeverity(matchScore, quest.rank);
+
+                if (failureSeverity === 'MINOR') {
+                    // Injury but survived
+                    const injury = this.selectRandomInjury();
+                    if (!adventurer.injuries) adventurer.injuries = [];
+                    adventurer.injuries.push(injury);
+                    flavorText = `${adventurer.name} was outmatched and took ${injury.name}. ` + (log.length > 0 ? log.join(" ") : "");
+                } else if (failureSeverity === 'CRITICAL') {
+                    // Check survival
+                    const survives = this.checkSurvival(adventurer, quest.rank);
+                    if (!survives) {
+                        adventurer.isDead = true;
+                        flavorText = `${adventurer.name} was killed. You sent them unprepared.`;
+                    } else {
+                        // PERMANENT limb loss
+                        const permanentInjury = this.selectPermanentInjury();
+                        if (!adventurer.injuries) adventurer.injuries = [];
+                        adventurer.injuries.push(permanentInjury);
+                        flavorText = `${adventurer.name} lost their ${permanentInjury.name}. A grave mistake.`;
+                    }
+                } else {
+                    // CATASTROPHIC - terrible mismatch
+                    adventurer.isDead = true;
+                    flavorText = `${adventurer.name} never stood a chance. This death is on you.`;
+                }
             }
         }
 
         console.log("Resolution: Outcome determined -", result);
 
-        // 3.5 PERSISTENCE SAVE (Optional)
+        // 3.5 CALCULATE GOLD EARNED
+        const baseReward = (quest.rewards && quest.rewards.gold) || 0;
+        let goldEarned = 0;
+
+        if (result === "SUCCESS") {
+            goldEarned = baseReward; // Full reward
+        } else if (result === "MIXED") {
+            goldEarned = Math.floor(baseReward * 0.5); // Half reward
+        } else if (result === "FAILURE" && !adventurer.isDead && adventurer.injuries.length > 0) {
+            // Partial reward if injured but alive
+            goldEarned = Math.floor(baseReward * 0.25);
+        } else {
+            goldEarned = 0; // No reward for death
+        }
+
+        console.log(`Resolution: Gold calculation - Base: ${baseReward}, Earned: ${goldEarned}`);
+
+        // 3.6 PERSISTENCE SAVE (Optional)
         try {
             if (window.gameState && window.gameState.persistence) {
                 console.log("Resolution: Saving to persistence...");
@@ -106,7 +153,8 @@ class ResolutionManager {
             log,
             questTitle: quest.title,
             adventurerName: adventurer.name,
-            flavorText
+            flavorText,
+            goldEarned // NEW: Include gold in result
         };
         console.log("Resolution: Returning:", returnObj);
         return returnObj;
@@ -145,6 +193,57 @@ class ResolutionManager {
         }
 
         return tags;
+    }
+
+    // NEW: Injury & Death System Helpers
+    static determineFailureSeverity(matchScore, questRank) {
+        // S/A rank: more likely critical/catastrophic
+        // Low score: worse outcome
+        const rankWeights = { S: 0.7, A: 0.5, B: 0.3, C: 0.2, D: 0.1, E: 0.05 };
+        const rankWeight = rankWeights[questRank] || 0.2;
+
+        // Terrible mismatch (score < 20) = catastrophic
+        if (matchScore < 20 && questRank in ['S', 'A']) {
+            return 'CATASTROPHIC';
+        }
+
+        // Random chance weighted by rank
+        const roll = Math.random();
+        if (roll < rankWeight) {
+            return 'CRITICAL'; // Permanent injury or death
+        } else {
+            return 'MINOR'; // Temporary injury
+        }
+    }
+
+    static selectRandomInjury() {
+        // Temporary injuries
+        const injuries = [
+            { id: 'broken_arm', name: 'Broken Arm', statPenalty: { str: -3 }, duration: 5, visual: 'bandaged_arm' },
+            { id: 'broken_leg', name: 'Shattered Leg', statPenalty: { dex: -3 }, duration: 7, visual: 'limping' },
+            { id: 'scarred', name: 'Battle Scars', statPenalty: { vit: -1 }, duration: -1, visual: 'scars' }
+        ];
+        return { ...injuries[Math.floor(Math.random() * injuries.length)] };
+    }
+
+    static selectPermanentInjury() {
+        // PERMANENT limb losses
+        const permanent = [
+            { id: 'lost_arm', name: 'Left Arm', statPenalty: { str: -4, dex: -3 }, duration: -1, visual: 'missing_arm' },
+            { id: 'lost_leg', name: 'Right Leg', statPenalty: { dex: -5, vit: -2 }, duration: -1, visual: 'wooden_leg' },
+            { id: 'lost_eye', name: 'an Eye', statPenalty: { int: -2, dex: -2 }, duration: -1, visual: 'eye_patch' },
+            { id: 'maimed', name: 'Hand (maimed)', statPenalty: { dex: -4, str: -2 }, duration: -1, visual: 'bandaged_hand' }
+        ];
+        return { ...permanent[Math.floor(Math.random() * permanent.length)] };
+    }
+
+    static checkSurvival(adventurer, questRank) {
+        // Higher VIT = better survival chance
+        // Higher rank = more dangerous
+        const baseChance = (adventurer.stats.vit || 5) / 10; // 0.3 to 1.0
+        const rankPenalties = { S: -0.4, A: -0.3, B: -0.2, C: -0.1, D: 0, E: 0.1 };
+        const survivalChance = Math.max(0.1, baseChance + (rankPenalties[questRank] || 0));
+        return Math.random() < survivalChance;
     }
 
     static getRules() {
