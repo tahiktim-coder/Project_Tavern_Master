@@ -8,7 +8,7 @@ window.GameSystems = window.GameSystems || {};
 
 class Adventurer {
     constructor(data) {
-        this.id = Date.now() + Math.random().toString(16).slice(2);
+        this.id = data.id || (Date.now() + Math.random().toString(16).slice(2));
         this.name = data.name;
         this.classId = data.classId;
         this.race = data.race || 'human'; // NEW: Store race for portraits

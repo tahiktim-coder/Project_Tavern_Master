@@ -17,6 +17,8 @@
     <script src="js/systems/Persistence.js"></script>
     <script src="js/systems/Economy.js"></script>
     <script src="js/systems/Input.js"></script>
+    <script src="js/systems/Events.js"></script>
+    <script src="js/systems/Town.js"></script>
 </head>
 
 <body>
@@ -132,7 +134,11 @@
                 const race = this.pickRaceForClass(charClass.id);
 
                 const equipment = { mainHand: "Basic Weapon", armor: "Basic Armor" };
-                const names = ["Garrett", "Lyra", "Thorn", "Elara", "Ragnar", "Sylas"];
+                const names = [
+                    "Garrett", "Lyra", "Thorn", "Elara", "Ragnar", "Sylas", "Kael", "Mira", "Dorn", "Vera",
+                    "Finn", "Isla", "Bram", "Nia", "Oren", "Tess", "Cade", "Luna", "Zane", "Hope",
+                    "Grom", "Thalia", "Voric", "Sera", "Merrick", "Juno", "Torin", "Ivy", "Xander", "Fae"
+                ];
                 const name = names[Math.floor(Math.random() * names.length)] + " the " + charClass.name;
 
                 return new Adventurer({
@@ -189,6 +195,10 @@
                 return Math.floor(Math.random() * (max - min + 1)) + min;
             }
         }
+
+        // Expose for external systems
+        window.GameSystems = window.GameSystems || {};
+        window.GameSystems.AdventurerGenerator = AdventurerGenerator;
 
         // 4. RENDERER (Previously Renderer.js)
         class Renderer {
@@ -281,15 +291,42 @@
                 this.ctx.lineWidth = 4;
                 this.ctx.stroke();
 
+                // 3.5. RANDOM EVENT BANNER
+                // Draw this AT THE TOP if we have one
+                let eventOffset = 0;
+                if (gameState.dailyEvent) {
+                    eventOffset = 70; // Push list down
+                    const ev = gameState.dailyEvent;
+
+                    // Banner BG
+                    this.ctx.fillStyle = ev.type === 'GOOD' ? "rgba(46, 125, 50, 0.1)" :
+                        (ev.type === 'BAD' ? "rgba(198, 40, 40, 0.1)" : "rgba(0, 0, 0, 0.05)");
+                    this.ctx.fillRect(bx + 40, by + 120, sheetW - 80, 60);
+                    this.ctx.strokeStyle = ev.type === 'GOOD' ? "#2e7d32" : (ev.type === 'BAD' ? "#c62828" : "#5d4037");
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(bx + 40, by + 120, sheetW - 80, 60);
+
+                    // Text
+                    this.ctx.textAlign = "center";
+                    this.ctx.font = "bold 22px 'MedievalSharp', cursive";
+                    this.ctx.fillStyle = ev.type === 'GOOD' ? "#1b5e20" : (ev.type === 'BAD' ? "#b71c1c" : "#3e2723");
+                    this.ctx.fillText(`EVENT: ${ev.title}`, this.width / 2, by + 145);
+
+                    this.ctx.font = "italic 16px monospace";
+                    this.ctx.fillStyle = "#5d4037";
+                    this.ctx.fillText(`${ev.description} ${ev.resolvedResult ? '(' + ev.resolvedResult + ')' : ''}`, this.width / 2, by + 170);
+                }
+
                 // 4. Entries
-                let cy = by + 140;
+                let cy = by + 140 + eventOffset;
                 const startX = bx + 80;
 
                 if (gameState.pendingReports && gameState.pendingReports.length > 0) {
                     const count = gameState.pendingReports.length;
                     // Dynamic Row Height Logic
                     // Available height: 410px (Reduced to fit footer). Min 55, Max 85.
-                    const availableH = 410;
+                    // Subtract event offset if one is present
+                    const availableH = 410 - eventOffset;
                     const rowHeight = Math.max(55, Math.min(85, availableH / count));
 
                     gameState.pendingReports.forEach((report, idx) => {
@@ -527,13 +564,14 @@
 
                         this.ctx.fillStyle = "#e0e0e0";
                         this.ctx.fillText(m.name, xName, y);
-                        this.ctx.fillText(`${m.class} (${m.level})`, xClass, y);
+                        const cls = m.classId ? m.classId.charAt(0).toUpperCase() + m.classId.slice(1) : "Unknown";
+                        this.ctx.fillText(`${cls} (${m.level || 1})`, xClass, y);
 
                         // Status Color
                         let status = "Ready";
                         let color = "#4caf50"; // Green
 
-                        if (m.isDead) { status = "Accident"; color = "red"; }
+                        if (m.isDead) { status = "Deceased"; color = "#b71c1c"; }
                         else if (m.injuries && m.injuries.length > 0) {
                             const inj = m.injuries[0]; // Get first injury
                             const dur = (inj && inj.duration !== undefined) ? inj.duration + "d" : "?";
@@ -641,10 +679,41 @@
                 this.ctx.fillText("Traits: " + member.traits.join(", "), x + 40, sy);
 
                 sy += 30;
-                if (member.injuries && member.injuries.length > 0) {
+                if (member.isDead) { // DECEASED DISPLAY
+                    this.ctx.fillStyle = "#b71c1c";
+                    this.ctx.fillText("Condition: DECEASED", x + 40, sy);
+                    this.ctx.font = "italic 16px monospace";
+                    sy += 25;
+
+                    if (member.deathDay) {
+                        this.ctx.fillText(`Died on Day ${member.deathDay}`, x + 40, sy);
+                        sy += 20;
+                    }
+                    if (member.deathReason) {
+                        this.ctx.font = "italic 14px monospace";
+                        // Simple wrap for reason
+                        const words = member.deathReason.split(' ');
+                        let line = "";
+                        words.forEach(word => {
+                            if (this.ctx.measureText(line + word).width > 220) {
+                                this.ctx.fillText(line, x + 40, sy);
+                                line = word + " ";
+                                sy += 18;
+                            } else {
+                                line += word + " ";
+                            }
+                        });
+                        this.ctx.fillText(line, x + 40, sy);
+                        sy += 10;
+                    }
+
+                    this.ctx.fillStyle = "#888";
+                    this.ctx.fillText("(Cannot go on quests)", x + 40, sy + 20);
+                } else if (member.injuries && member.injuries.length > 0) {
                     this.ctx.fillStyle = "#ff5252";
                     const inj = member.injuries[0];
-                    this.ctx.fillText(`INJURY: ${inj.name} (-${inj.duration}d)`, x + 40, sy);
+                    const durText = inj.duration < 0 ? "PERMANENT" : `-${inj.duration}d`;
+                    this.ctx.fillText(`INJURY: ${inj.name} (${durText})`, x + 40, sy);
                 } else {
                     this.ctx.fillStyle = "#66bb6a";
                     this.ctx.fillText("Condition: Healthy", x + 40, sy);
@@ -686,21 +755,29 @@
                     this.drawQuestBoard(gameState.quests);
                 }
 
-                // Draw Adventurer
+                // Draw Adventurer or Empty State
                 const hero = gameState.currentAdventurer;
                 if (hero) {
                     this.drawAdventurerPlaceholder(hero);
+                } else {
+                    // Draw Empty State
+                    this.ctx.fillStyle = "rgba(0,0,0,0.5)";
+                    this.ctx.font = "italic 30px 'MedievalSharp', cursive";
+                    this.ctx.textAlign = "center";
+                    this.ctx.fillText("The Hall is Empty.", this.width / 2, this.height / 2);
+                    this.ctx.font = "italic 20px 'MedievalSharp', cursive";
+                    this.ctx.fillText("(End the Day to see new visitors)", this.width / 2, this.height / 2 + 40);
                 }
 
                 // UI: Gold & Day - WITH PROPER BACKGROUNDS
                 // Dark panel background for contrast
                 this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-                this.ctx.fillRect(10, 10, 180, 75);
+                this.ctx.fillRect(10, 10, 180, 100); // Taller (was 75)
 
                 // Gold border accent
                 this.ctx.strokeStyle = "#FFD700";
                 this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(10, 10, 180, 75);
+                this.ctx.strokeRect(10, 10, 180, 100);
 
                 // Gold text
                 this.ctx.fillStyle = "#FFD700";
@@ -712,9 +789,15 @@
                 this.ctx.fillStyle = "#FFFFFF";
                 this.ctx.fillText(`Day: ${gameState.day} `, 20, 68);
 
+                // Queue text
+                const queueCount = gameState.town ? gameState.town.dailyQueue.length : 0;
+                this.ctx.fillStyle = "#B0BEC5"; // Blue-grey
+                this.ctx.font = "bold 16px monospace";
+                this.ctx.fillText(`Queue: ${queueCount} `, 20, 88);
+
                 // UI: Guild Roster Button
                 const rosterBtnX = 10;
-                const rosterBtnY = 95;
+                const rosterBtnY = 115; // Moved down (was 95)
                 const rosterBtnW = 180;
                 const rosterBtnH = 50;
 
@@ -752,59 +835,62 @@
 
 
                 // UI: Action Buttons (Bottom Center Area)
-                // MOVED UP for better visibility
+                // Only if Hero exists
+                if (hero) {
+                    // MOVED UP for better visibility
 
-                // 1. RECRUIT BUTTON (Left)
-                const recruitX = 302;
-                const recruitY = 560; // Moved up from 620
-                const recruitW = 200;
-                const recruitH = 60;
+                    // 1. RECRUIT BUTTON (Left)
+                    const recruitX = 302;
+                    const recruitY = 560; // Moved up from 620
+                    const recruitW = 200;
+                    const recruitH = 60;
 
-                // Draw Recruit Button
-                this.ctx.fillStyle = "#2e7d32"; // Green
-                this.ctx.fillRect(recruitX, recruitY, recruitW, recruitH);
+                    // Draw Recruit Button
+                    this.ctx.fillStyle = "#2e7d32"; // Green
+                    this.ctx.fillRect(recruitX, recruitY, recruitW, recruitH);
 
-                // Bevel
-                this.ctx.fillStyle = "#4caf50";
-                this.ctx.fillRect(recruitX, recruitY, recruitW, 4);
-                this.ctx.fillStyle = "#1b5e20";
-                this.ctx.fillRect(recruitX, recruitY + recruitH - 4, recruitW, 4);
+                    // Bevel
+                    this.ctx.fillStyle = "#4caf50";
+                    this.ctx.fillRect(recruitX, recruitY, recruitW, 4);
+                    this.ctx.fillStyle = "#1b5e20";
+                    this.ctx.fillRect(recruitX, recruitY + recruitH - 4, recruitW, 4);
 
-                this.ctx.fillStyle = "#fff";
-                this.ctx.textAlign = "center";
-                this.ctx.font = "bold 20px 'MedievalSharp', cursive";
-                // Show "HIRED" if already in guild
-                const recruitText = (hero && hero.isGuildMember) ? "HIRED" : "HIRE (100 G)";
-                this.ctx.fillText(recruitText, recruitX + recruitW / 2, recruitY + 38);
+                    this.ctx.fillStyle = "#fff";
+                    this.ctx.textAlign = "center";
+                    this.ctx.font = "bold 20px 'MedievalSharp', cursive";
+                    // Show "HIRED" if already in guild
+                    const recruitText = (hero && hero.isGuildMember) ? "HIRED" : "HIRE (100 G)";
+                    this.ctx.fillText(recruitText, recruitX + recruitW / 2, recruitY + 38);
 
-                // 2. DISMISS BUTTON (Right)
-                const dismissX = 522;
-                const dismissY = 560; // Moved up from 620
-                const dismissW = 200;
-                const dismissH = 60;
+                    // 2. DISMISS BUTTON (Right)
+                    const dismissX = 522;
+                    const dismissY = 560; // Moved up from 620
+                    const dismissW = 200;
+                    const dismissH = 60;
 
-                // Check if we can dismiss (Must have quests?)
-                const canDismiss = gameState.quests && gameState.quests.length > 0;
+                    // Check if we can dismiss (Must have quests?)
+                    const canDismiss = gameState.quests && gameState.quests.length > 0;
 
-                if (canDismiss) {
-                    this.ctx.fillStyle = "#546e7a"; // Stone Blue
-                } else {
-                    this.ctx.fillStyle = "#37474f"; // Dark/Disabled
+                    if (canDismiss) {
+                        this.ctx.fillStyle = "#546e7a"; // Stone Blue
+                    } else {
+                        this.ctx.fillStyle = "#37474f"; // Dark/Disabled
+                    }
+                    this.ctx.fillRect(dismissX, dismissY, dismissW, dismissH);
+
+                    if (canDismiss) {
+                        this.ctx.fillStyle = "#78909c";
+                        this.ctx.fillRect(dismissX, dismissY, dismissW, 4);
+                        this.ctx.fillStyle = "#37474f";
+                        this.ctx.fillRect(dismissX, dismissY + dismissH - 4, dismissW, 4);
+                        this.ctx.fillStyle = "#eceff1";
+                    } else {
+                        this.ctx.fillStyle = "#546e7a"; // Dim Text
+                    }
+
+                    this.ctx.font = "bold 22px 'MedievalSharp', cursive";
+                    this.ctx.fillText("DISMISS", dismissX + dismissW / 2, dismissY + 38);
                 }
-                this.ctx.fillRect(dismissX, dismissY, dismissW, dismissH);
-
-                if (canDismiss) {
-                    this.ctx.fillStyle = "#78909c";
-                    this.ctx.fillRect(dismissX, dismissY, dismissW, 4);
-                    this.ctx.fillStyle = "#37474f";
-                    this.ctx.fillRect(dismissX, dismissY + dismissH - 4, dismissW, 4);
-                    this.ctx.fillStyle = "#eceff1";
-                } else {
-                    this.ctx.fillStyle = "#546e7a"; // Dim Text
-                }
-
-                this.ctx.font = "bold 22px 'MedievalSharp', cursive";
-                this.ctx.fillText("DISMISS", dismissX + dismissW / 2, dismissY + 38);
 
 
 
@@ -927,10 +1013,59 @@
                     this.ctx.fillText(label, x + 5, y + 15);
                 };
 
-                // 1. Roster Button
-                drawBox(10, 95, 180, 50, "ROSTER");
+                // 0. DROP ZONE DEBUG (Green - Matches Portrait Frame)
+                // 0. DROP ZONE DEBUG (Green - Matches Portrait Frame)
+                const dcx = this.width / 2;
+                const dcy = this.height / 2 - 100;
+                // Dynamic: Matches visual code exactly
+                this.ctx.strokeStyle = "#00FF00";
+                this.ctx.strokeRect(dcx - 120, dcy - 120, 240, 240);
+                this.ctx.fillStyle = "#00FF00";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText("DROP ZONE", dcx, dcy - 120);
 
-                // 2. End Day
+                // Reset to Red
+                this.ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
+                this.ctx.fillStyle = "red";
+                this.ctx.textAlign = "left";
+
+                // 1. Roster Button
+                drawBox(10, 115, 180, 50, "ROSTER");
+
+                // DEBUG ROSTER LIST (Top Right)
+                if (gameState.persistence && gameState.persistence.roster) {
+                    let dy = 100;
+                    this.ctx.textAlign = "right";
+                    this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                    this.ctx.fillRect(this.width - 320, 80, 310, 300);
+
+                    this.ctx.fillStyle = "white";
+                    this.ctx.font = "14px monospace";
+                    this.ctx.fillText("--- GUILD ROSTER DEBUG ---", this.width - 10, dy);
+                    dy += 20;
+
+                    let count = 0;
+                    for (const [id, adv] of gameState.persistence.roster.entries()) {
+                        let status = adv.isAssigned ? "BUSY" : "FREE";
+                        if (adv.isDead) status = "DEAD";
+                        else if (adv.injuries && adv.injuries.length > 0) status = "INJURED";
+                        else if (adv.lastSeenDay === gameState.day) status = "SEEN";
+
+                        const col = status === "BUSY" ? "red" : (status === "DEAD" ? "black" : (status === "INJURED" ? "orange" : (status === "SEEN" ? "gray" : "#00FF00")));
+                        this.ctx.fillStyle = col;
+                        // Show Name, last 4 chars of ID, and Status
+                        const txt = `${adv.name.substr(0, 8)}.. [..${id.substr(-4)}] : ${status}`;
+                        this.ctx.fillText(txt, this.width - 10, dy);
+                        dy += 20;
+                        count++;
+                        if (count > 12) break; // Limit list
+                    }
+                    if (gameState.town) {
+                        this.ctx.fillStyle = "cyan";
+                        this.ctx.fillText(`Town Queue: ${gameState.town.dailyQueue ? gameState.town.dailyQueue.length : 0}`, this.width - 10, dy + 20);
+                    }
+                    this.ctx.textAlign = "left"; // Reset
+                }
                 drawBox(860, 30, 130, 50, "END DAY");
 
                 // 3. Recruit (Hitbox)
@@ -944,13 +1079,6 @@
                 // Visual Center calculated: h/2 - 100
                 const inspectCy = this.height / 2 - 100;
                 drawBox(cx - 120, inspectCy - 120, 240, 240, "INSPECT (R-CLICK)");
-
-                // 6. Quest Drop Zone (Input System Logic)
-                // Center calculated: h/2 - 100
-                this.ctx.strokeStyle = "cyan";
-                this.ctx.fillStyle = "cyan";
-                // Input: hitX = cx - 120, hitY = cy - 120, w=240, h=240
-                drawBox(cx - 120, inspectCy - 120, 240, 240, "DROP ZONE");
 
                 this.ctx.restore();
             }
@@ -1154,67 +1282,78 @@
             getPortrait(hero) {
                 if (!hero.race || !hero.classId) return null;
 
-                // Smart portrait mapping based on available files:
-                // dwarf_paladin, elf_mage, elf_ranger, human_cleric, human_necromancer, 
-                // human_rogue, human_warrior, orc_barbarian, orc_barbarian_rusty
+                // STRICT LIST OF NEW ASSETS
+                const VALID_ASSETS = [
+                    "dwarf_paladin_1.png", "dwarf_paladin_2.png", "dwarf_paladin_3.png", "dwarf_paladin_4.png", "dwarf_paladin_5.png",
+                    "elf_druid_female_1.jpg",
+                    "elf_mage_1.png",
+                    "elf_ranger_1.png", "elf_ranger_2.png", "elf_ranger_3.png",
+                    "human_assassin_1.png", "human_assassin_2.png", "human_assassin_3.png", "human_assassin_4.png",
+                    "human_cleric_male_1.png", "human_cleric_male_2.png",
+                    "human_knight_verdant_female_1.png",
+                    "human_knight_verdant_male_1.png", "human_knight_verdant_male_2.png", "human_knight_verdant_male_3.png",
+                    "human_necromancer_1.jpg", "human_necromancer_2.png", "human_necromancer_verdant_1.png",
+                    "human_paladin_2.png", "human_paladin_3.png", "human_paladin_4.png", "human_paladin_5.png", "human_paladin_6.png", "human_paladin_7.png",
+                    "human_paladin_female_1.jpg",
+                    "human_paladin_verdant_1.png", "human_paladin_verdant_2.png",
+                    "human_ranger_1.png",
+                    "human_rogue_male_2.png", "human_rogue_male_3.png",
+                    "human_warrior_male_1.png", "human_warrior_male_2.png", "human_warrior_male_3.png", "human_warrior_male_4.png", "human_warrior_male_5.png", "human_warrior_male_6.png", "human_warrior_male_7.png",
+                    "human_warrior_verdant_1.png",
+                    "human_wizard_male_1.jpg", "human_wizard_old_1.jpg",
+                    "orc_shaman_1.png",
+                    "orc_warrior_1.png"
+                ];
 
-                let portraitKey = null;
+                let candidates = [];
+                const race = (hero.race || "").toLowerCase();
+                const cls = (hero.classId || "").toLowerCase();
 
-                // 1. Direct map first
-                const directKey = `${hero.race}_${hero.classId}`;
+                // 1. Try Fuzzy Match (Race + Class)
+                candidates = VALID_ASSETS.filter(f => f.includes(race) && f.includes(cls));
 
-                // 2. Fallback mapping based on class type
-                if (hero.race === 'human') {
-                    if (['warrior', 'pit_fighter', 'mercenary', 'ronin', 'guard'].includes(hero.classId)) {
-                        portraitKey = 'human_warrior';
-                    } else if (hero.classId === 'knight') {
-                        portraitKey = 'human_knight';
-                    } else if (['rogue', 'spy', 'treasure_hunter'].includes(hero.classId)) {
-                        portraitKey = 'human_rogue';
-                    } else if (['assassin'].includes(hero.classId)) {
-                        portraitKey = 'human_rogue';
-                    } else if (['bard'].includes(hero.classId)) {
-                        portraitKey = 'human_rogue';
-                    } else if (['cleric'].includes(hero.classId)) {
-                        portraitKey = 'human_cleric';
-                    } else if (['monk'].includes(hero.classId)) {
-                        portraitKey = 'human_cleric';
-                    } else if (['necromancer', 'cultist'].includes(hero.classId)) {
-                        portraitKey = 'human_necromancer';
+                // 2. Class-Based Fallbacks (if specific file missing)
+                if (candidates.length === 0) {
+                    if (['knight', 'paladin', 'noble', 'monk', 'cleric'].includes(cls)) {
+                        candidates = VALID_ASSETS.filter(f => f.includes('paladin'));
+                    }
+                    else if (['necromancer', 'cultist', 'warlock', 'undead'].includes(cls)) {
+                        candidates = VALID_ASSETS.filter(f => f.includes('necromancer'));
+                    }
+                    else if (['wizard', 'elementalist', 'sorcerer', 'archmage', 'scholar', 'sage', 'illusionist', 'battle_mage'].includes(cls)) {
+                        candidates = VALID_ASSETS.filter(f => f.includes('wizard') || f.includes('mage'));
+                    }
+                    else if (['druid', 'hedge_wizard', 'ranger', 'hunter'].includes(cls)) {
+                        candidates = VALID_ASSETS.filter(f => f.includes('druid'));
+                    }
+                    else if (['warrior', 'mercenary', 'guard', 'soldier', 'ronin', 'pit_fighter'].includes(cls)) {
+                        candidates = VALID_ASSETS.filter(f => f.includes('warrior'));
+                    }
+                    else if (['rogue', 'spy', 'treasure_hunter', 'assassin', 'bard'].includes(cls)) {
+                        candidates = VALID_ASSETS.filter(f => f.includes('rogue'));
                     }
                 }
 
-                if (hero.race === 'elf') {
-                    if (['battle_mage', 'scholar', 'illusionist', 'elementalist', 'hedge_wizard'].includes(hero.classId)) {
-                        portraitKey = 'elf_mage';
-                    } else if (['ranger', 'druid'].includes(hero.classId)) {
-                        portraitKey = 'elf_ranger';
-                    }
+                if (candidates.length === 0) return null; // Fallback to Silhouette
+
+                // DETERMINISTIC SELECTION (Hash ID to Index)
+                let idx = 0;
+                if (hero.id) {
+                    let hash = 0;
+                    for (let i = 0; i < hero.id.length; i++) hash += hero.id.charCodeAt(i);
+                    idx = Math.abs(hash) % candidates.length;
                 }
 
-                if (hero.race === 'orc' && hero.classId === 'barbarian') {
-                    // Check for rusty variant
-                    if (hero.visuals && hero.visuals.includes('rusty_gear')) {
-                        portraitKey = 'orc_barbarian_rusty';
-                    } else {
-                        portraitKey = 'orc_barbarian';
-                    }
-                }
+                const filename = candidates[idx];
 
-                if (hero.race === 'dwarf' && hero.classId === 'paladin') {
-                    portraitKey = 'dwarf_paladin';
-                }
-
-                if (!portraitKey) return null;
-
-                // Return cached or create new
-                if (!this.portraits[portraitKey]) {
+                // Load/Cache
+                if (!this.portraits[filename]) {
                     const img = new Image();
-                    img.src = `assets/portraits/${portraitKey}.png`;
-                    this.portraits[portraitKey] = img;
+                    img.src = `assets/portraits/${filename}`;
+                    this.portraits[filename] = img;
                 }
 
-                return this.portraits[portraitKey];
+                return this.portraits[filename];
             }
 
             drawAdventurerPlaceholder(hero) {
@@ -1475,8 +1614,25 @@
                 gameState.persistence.resetDailyState();
             }
 
-            // Generate Adventurer
-            gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
+            // Generate Adventurer (OLD)
+            // gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
+
+            // NEW TOWN LOGIC
+            // Generate Weekly Pool on Day 1 (or 8, 15...)
+            if (gameState.day === 1 || (gameState.day - 1) % 7 === 0) {
+                gameState.town.generateWeeklyPool(gameState.day);
+            }
+            // Generate Daily Queue
+            gameState.town.generateDailyQueue();
+
+            // Get first visitor
+            // chance for returning member is handled in 'nextAdventurer', 
+            // but for first slot of day, let's just pull from town or set null and let user click?
+            // Let's autopull first visitor.
+            gameState.currentAdventurer = gameState.town.getNextVisitor();
+
+            // Mark as busy immediately to prevent double-assignment logic (Safe default)
+            // if (gameState.currentAdventurer) gameState.currentAdventurer.isAssigned = false;
 
             // Load Quests (from Data Layer)
             if (window.GameData && window.GameData.Quests) {
@@ -1497,25 +1653,52 @@
             gameState.economy = new window.GameSystems.EconomyManager(50);
             gameState.inspector = new window.GameSystems.Inspector();
             gameState.persistence = new window.GameSystems.PersistenceManager(); // NEW
+            gameState.events = new window.GameSystems.EventManager(); // NEW
+            gameState.town = new window.GameSystems.TownManager(); // NEW
             const input = new window.GameSystems.InputController(canvas, gameState);
 
             // Event: Next Adventurer (Same Day)
-            document.addEventListener('nextAdventurer', () => {
-                // Chance to return old adventurer?
-                let returningParams = null;
-                // 30% chance if we have history
-                if (gameState.persistence && Math.random() < 0.3) {
-                    returningParams = gameState.persistence.getReturningAdventurer();
-                }
+            document.addEventListener('nextAdventurer', (e) => {
+                const delay = e.detail && e.detail.delay ? e.detail.delay : 0;
 
-                if (returningParams) {
-                    console.log("RETURNING HERO:", returningParams.name);
-                    gameState.currentAdventurer = new window.GameSystems.Adventurer(returningParams);
-                    // Force refresh visuals in case traits changed
-                    // (Constructor calls generateVisuals, so it should be fine if traits are passed correctly)
-                } else {
-                    gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
-                }
+                setTimeout(() => {
+                    let nextHero = null;
+                    const roll = Math.random();
+
+                    // 1. Try Guild Return (30%)
+                    if (roll < 0.3) {
+                        const data = gameState.persistence.getReturningAdventurer();
+                        if (data) nextHero = new window.GameSystems.Adventurer(data);
+                    }
+
+                    // 2. If no guild member (or roll failed), Try Town Visitor
+                    if (!nextHero) {
+                        nextHero = gameState.town.getNextVisitor();
+
+                        // If Town Queue is empty, fallback to Guild Member (if any)
+                        if (!nextHero) {
+                            const data = gameState.persistence.getReturningAdventurer();
+                            if (data) nextHero = new window.GameSystems.Adventurer(data);
+                        }
+                    }
+
+                    gameState.currentAdventurer = nextHero;
+
+                    // Mark as Seen Today (prevents cycling if dismissed)
+                    if (nextHero) {
+                        nextHero.lastSeenDay = gameState.day;
+                        // Force Persistence Update if Guild Member
+                        if (nextHero.isGuildMember && gameState.persistence) {
+                            gameState.persistence.roster.set(nextHero.id, nextHero);
+                        }
+                    }
+
+                    if (!gameState.currentAdventurer) {
+                        console.log("The Hall is empty. No more visitors today.");
+                    } else {
+                        console.log("Next Adventurer:", gameState.currentAdventurer.name);
+                    }
+                }, delay);
             });
 
             // Event: Manual End Day
@@ -1523,6 +1706,12 @@
                 // Process Upkeep
                 const upkeep = gameState.economy.processDailyUpkeep();
                 gameState.lastUpkeep = upkeep; // Store for report display
+
+                // Roll Daily Event
+                if (gameState.events) {
+                    gameState.dailyEvent = gameState.events.rollEvent(gameState);
+                }
+
                 if (upkeep.bankrupt) {
                     alert("GAME OVER: You ran out of gold!");
                     location.reload();
@@ -1548,12 +1737,24 @@
                     return;
                 }
 
+                // CHECK LIMIT (Max 12 ACTIVE members. Dead do not count.)
+                const rosterArr = Array.from(gameState.persistence.roster.values());
+                const activeCount = rosterArr.filter(m => !m.isDead).length;
+
+                if (activeCount >= 12) {
+                    alert("Guild is full! (Max 12 active members). Dismiss someone or wait for... accidents.");
+                    return;
+                }
+
                 // Direct Gold Deduction (Safer)
                 gameState.economy.gold -= 100;
 
                 // Recruit THIS adventurer
                 hero.isGuildMember = true;
-                console.log("Recruited:", hero.name);
+                gameState.town.recruit(hero.id); // Remove from Town Pool
+
+                // Add to Roster Persistence
+                gameState.persistence.addToRoster(hero);
 
                 // Visual Feedback
                 gameState.stamp = { type: 'HIRED', val: 0 };

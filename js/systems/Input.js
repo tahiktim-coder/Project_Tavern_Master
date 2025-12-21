@@ -38,6 +38,12 @@ class InputController {
         this.mouse.x = pos.x;
         this.mouse.y = pos.y;
 
+        // ROUTING
+        if (this.gameState.screen === 'ROSTER') {
+            this.handleRosterInput(pos);
+            return;
+        }
+
         // Only interact in GAME state
         if (this.gameState.screen !== 'GAME') return;
 
@@ -92,7 +98,7 @@ class InputController {
         }
 
         // CHECK 0.4: Roster Button (Top Left - Under Day)
-        if (pos.x >= 10 && pos.x <= 190 && pos.y >= 95 && pos.y <= 145) {
+        if (pos.x >= 10 && pos.x <= 190 && pos.y >= 115 && pos.y <= 165) {
             const event = new CustomEvent('toggleRoster');
             document.dispatchEvent(event);
             return;
@@ -109,6 +115,8 @@ class InputController {
         // CHECK 0.7: Action Buttons (Bottom Center)
         // Exact Match to Visuals: y=[560, 620]
         if (pos.y >= 560 && pos.y <= 620) {
+            // Safety: No interactions if empty
+            if (!this.gameState.currentAdventurer) return;
             console.log("Input: Bottom Area Click at", pos.x);
 
             // RECRUIT: Visual [302, 502]
@@ -227,10 +235,11 @@ class InputController {
         const centerY = this.canvas.height / 2;
 
         // Rectangular Hitbox for reliability
-        // Center of Visual is h/2 - 100
-        const zoneCenterY = centerY - 100;
-        const hitX = centerX - 120; // Match Portrait Width (240)
-        const hitY = zoneCenterY - 120; // Match Portrait Height (240)
+        // Rectangular Hitbox for reliability (Matches Portrait Visual)
+        // Rectangular Hitbox for reliability (Matches Portrait Visual)
+        // Dynamic: cx-120, cy-100-120 = cy-220. Matches Inspect Window Logic.
+        const hitX = centerX - 120;
+        const hitY = centerY - 220;
         const hitW = 240;
         const hitH = 240;
 
@@ -319,6 +328,66 @@ class InputController {
             }, 800);
         } else {
             console.log("Input: ERROR - ResolutionManager not found!");
+        }
+    }
+    handleRosterInput(pos) {
+        // Modal Active?
+        if (this.gameState.rosterDetailMember) {
+            const w = 600;
+            const h = 550;
+            const x = (this.canvas.width - w) / 2;
+            const y = (this.canvas.height - h) / 2;
+
+            // Close Button (Top Right): x + w - 40, y, 40, 40
+            if (pos.x >= x + w - 40 && pos.x <= x + w && pos.y >= y && pos.y <= y + 40) {
+                this.gameState.rosterDetailMember = null;
+                return;
+            }
+
+            const btnY = y + h - 80;
+
+            // Heal Button: x + 40, btnY, 160, 50
+            if (pos.x >= x + 40 && pos.x <= x + 200 && pos.y >= btnY && pos.y <= btnY + 50) {
+                // Check Money (50G)
+                const member = this.gameState.rosterDetailMember;
+                if (member.injuries && member.injuries.length > 0) {
+                    if (this.gameState.economy.gold >= 50) {
+                        this.gameState.economy.gold -= 50;
+                        member.injuries = []; // Initial Cure All
+                        alert("Healed " + member.name + " for 50 Gold.");
+                    } else {
+                        alert("Not enough gold (Need 50).");
+                    }
+                }
+                return;
+            }
+
+            // Fire Button: x + w - 180, btnY, 140, 50
+            if (pos.x >= x + w - 180 && pos.x <= x + w - 40 && pos.y >= btnY && pos.y <= btnY + 50) {
+                const member = this.gameState.rosterDetailMember;
+                const confirm = window.confirm("Fire " + member.name + "?");
+                if (confirm) {
+                    this.gameState.persistence.removeFromRoster(member.id);
+                    this.gameState.rosterDetailMember = null;
+                }
+                return;
+            }
+
+            // Click outside to close
+            if (pos.x < x || pos.x > x + w || pos.y < y || pos.y > y + h) {
+                this.gameState.rosterDetailMember = null;
+            }
+            return;
+        }
+
+        // List View - Click Row
+        // Rows start at Y=150, Height=40
+        if (pos.y >= 150) {
+            const index = Math.floor((pos.y - 150) / 40);
+            const roster = Array.from(this.gameState.persistence.roster.values());
+            if (index >= 0 && index < roster.length) {
+                this.gameState.rosterDetailMember = roster[index];
+            }
         }
     }
 }

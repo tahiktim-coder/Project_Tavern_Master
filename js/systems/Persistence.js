@@ -56,37 +56,12 @@ class PersistenceManager {
             result: report.result
         });
 
-        // apply CONSEQUENCES
-        if (report.result === "FAILURE") {
-            // Chance to gain a negative trait or injury
-            if (Math.random() > 0.5) {
-                // Add a visual scar/trait
-                if (!data.traits.includes("Injured")) {
-                    data.traits.push("Injured");
-                    // Assuming Adventurer.js will map "Injured" to "bandaged" eventually
-                    // Or we manually add visual tags here if we store visuals?
-                    // Better to rely on traits regenerating visuals on load.
+        // CONSEQUENCES are now handled by ResolutionManager.js before calling this.
+        // We only save the updated state here.
 
-                    // Decrease stats
-                    data.stats.str = Math.max(1, data.stats.str - 2);
-                    data.stats.dex = Math.max(1, data.stats.dex - 2);
-                    data.stats.currentHp = Math.floor(data.stats.maxHp / 2) || 5; // Start half health next time
-                }
-            } else {
-                if (!data.traits.includes("Cowardly")) {
-                    data.traits.push("Cowardly"); // Traumatized
-                }
-            }
-        } else if (report.result === "SUCCESS") {
-            // Chance to gain stats
-            if (Math.random() > 0.7) {
-                data.stats.str += 1;
-                // Maybe become Arrogant?
-                if (!data.traits.includes("Arrogant") && Math.random() > 0.8) {
-                    data.traits.push("Arrogant");
-                }
-            }
-        }
+        // Ensure traits/stats are saved
+        if (!data.traits) data.traits = [];
+        if (!data.injuries) data.injuries = [];
 
         this.roster.set(data.id, data);
 
@@ -101,26 +76,50 @@ class PersistenceManager {
 
     setAssigned(id, status) {
         const data = this.roster.get(id);
-        if (data) data.isAssigned = status;
+        if (data) {
+            data.isAssigned = status;
+            this.roster.set(id, data); // Explicitly ensure map is updated
+            console.log(`Persistence: Set Assigned ${status} for ${data.name} (ID: ${id})`);
+        } else {
+            console.warn(`Persistence: Could not find member ${id} to assign.`);
+        }
     }
 
     resetDailyState() {
-        this.roster.forEach(member => {
-            member.isAssigned = false;
+        this.roster.forEach(adv => {
+            adv.isAssigned = false;
+            // Healing Logic
+            if (adv.injuries && adv.injuries.length > 0) {
+                adv.injuries.forEach(inj => {
+                    // Only heal temporary injuries
+                    if (inj.duration !== undefined && inj.duration > 0) inj.duration--;
+                });
+                // Remove healed injuries (duration 0). Keep permanent (-1).
+                adv.injuries = adv.injuries.filter(inj => inj.duration !== 0);
+
+                if (adv.injuries.length === 0) adv.traits = adv.traits.filter(t => t !== 'Injured');
+            }
         });
-        console.log("Daily Roster State Reset (isAssigned = false)");
+        console.log("Persistence: Daily Roster Reset (Healing Applied, Perm Injuries Kept)");
     }
 
     getReturningAdventurer() {
-        if (this.roster.size === 0) return null;
+        // Filter: Not Dead, Not Assigned, Not Injured, Not Seen Today
+        const currentDay = window.gameState ? window.gameState.day : 0;
+        const candidates = Array.from(this.roster.values()).filter(m =>
+            !m.isDead &&
+            !m.isAssigned &&
+            (!m.injuries || m.injuries.length === 0) &&
+            (m.lastSeenDay !== currentDay)
+        );
 
-        // Filter: Must be alive and NOT assigned
-        const candidates = Array.from(this.roster.values()).filter(m => !m.isDead && !m.isAssigned);
+        console.log(`Persistence: Found ${candidates.length} candidates for return.`);
 
         if (candidates.length === 0) return null;
 
-        const data = candidates[Math.floor(Math.random() * candidates.length)];
-        return data;
+        const idx = Math.floor(Math.random() * candidates.length);
+        const data = candidates[idx];
+        return data; // Returns DATA object.
     }
 }
 

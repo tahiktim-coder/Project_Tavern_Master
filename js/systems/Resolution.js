@@ -96,7 +96,9 @@ class ResolutionManager {
                     const survives = this.checkSurvival(adventurer, quest.rank);
                     if (!survives) {
                         adventurer.isDead = true;
-                        flavorText = `${adventurer.name} was killed. You sent them unprepared.`;
+                        adventurer.deathReason = `${adventurer.name} was killed. You sent them unprepared.`;
+                        adventurer.deathDay = (window.gameState && window.gameState.day) || 1;
+                        flavorText = adventurer.deathReason;
                     } else {
                         // PERMANENT limb loss
                         const permanentInjury = this.selectPermanentInjury();
@@ -107,7 +109,9 @@ class ResolutionManager {
                 } else {
                     // CATASTROPHIC - terrible mismatch
                     adventurer.isDead = true;
-                    flavorText = `${adventurer.name} never stood a chance. This death is on you.`;
+                    adventurer.deathReason = `${adventurer.name} never stood a chance. This death is on you.`;
+                    adventurer.deathDay = (window.gameState && window.gameState.day) || 1;
+                    flavorText = adventurer.deathReason;
                 }
             }
         }

@@ -1,59 +1,62 @@
-# Guild Master - Implementation Plan
+# Implementation Plan: Project Tavern Master Evolution
 
-This plan outlines the technical steps to build the initial prototype of "Guild Master".
+This document outlines the step-by-step roadmap to transform the prototype into the "Weekly Survival Strategy" game defined in the Deep Dive Concept.
 
-## Goal Description
-Create a functional prototype of the "Guild Master" game loop. The prototype will allow players to:
-1.  View adventurers approaching the counter.
-2.  Inspect their details (Adventurer Card).
-3.  View available quests (Quest Board).
-4.  Assign or Reject quests.
-5.  See the results of the day.
+---
 
-## User Review Required
-> [!IMPORTANT]
-> **Tech Stack**:
-> *   **Javascript/Canvas**: Vanilla JS is EXCELLENT for 2D pixel art. We will use the HTML5 Canvas API which is fast and supports pixel manipulation natively.
-> *   **Assets**: I will specificially generate "Pixel Art" style assets for you to use.
-> *   **Visuals**: We will use CSS `image-rendering: pixelated` to ensure the game looks crisp and retro, not blurry, even when zoomed in.
+## 1. Core Architecture Changes
+We need to shift from "Infinite Generation" to "Stateful Management".
 
-## Proposed Changes
+**New Systems Required:**
+*   `TownManager.js`: Manages the pool of available adventurers in town (The "Deck").
+*   `CycleManager.js`: Tracks Days (1-7), Weeks, and Quotas.
+*   `VisitorSystem.js`: Handles special narrative NPCs (Widows, Guards) before the recruit loop.
 
-### Core Structure
-#### [NEW] [index.html](file:///C:/Users/farha/Project_Tavern_Master/index.html)
-- Main entry point. Contains the canvas/div structure for the game view.
+---
 
-#### [NEW] [style.css](file:///C:/Users/farha/Project_Tavern_Master/style.css)
-- Styling for the "Desk View", the cards, and the mood/atmosphere.
+## 2. Phased Rollout Plan
 
-#### [NEW] [script.js](file:///C:/Users/farha/Project_Tavern_Master/script.js)
-- Main entry point for the JS logic. Handles the "Day Loop".
+### **Phase 1: The Finite Town Pool (The Foundation)**
+*Objective*: Stop infinite random adventurer spawning. Make the list of candidates finite and persistent for the week.
+*   **Step 1.1 - Data Model**: Create `TownManager` class. On `init()`, generate 12 Adventurers and store them in `townRoster`.
+*   **Step 1.2 - Visitor Queue**: Logic to shuffle `townRoster` and present a daily "Queue" of 4-5 visitors.
+*   **Step 1.3 - Persistence**:
+    *   If **Recruited**: Move from `TownRoster` to `GuildRoster`.
+    *   If **Dismissed**: Return to `TownRoster` (Can appear again tomorrow).
+    *   If **Rejected/Banned**: Remove from `TownRoster` permanently (Optional feature).
+*   **Step 1.4 - UI Updates**: Add a "Town Census" counter (e.g., "7 Adventurers in town") to the HUD.
+*   **Result**: You will notice "Garrett" coming back the next day if you didn't hire him.
 
-### Game Logic Details
-#### [NEW] [src/adventurer.js](file:///C:/Users/farha/Project_Tavern_Master/src/adventurer.js)
-- `Adventurer` class.
-- Random generation logic (names, classes, flawed equipment, hidden traits).
-- **Persistence**: Has an `id` to track them across days.
-- **History**: Stores `injuries` (e.g., "missing_arm") and `trust_level`.
+### **Phase 2: The Weekly Cycle & Quota**
+*Objective*: Add the "Lose Condition" and Time Pressure.
+*   **Step 2.1 - Cycle Logic**: Track `CurrentDay` (1-7).
+*   **Step 2.2 - Experience Quota**: Start of Week -> Generate Goal (e.g., "Pay 200G Taxes").
+*   **Step 2.3 - End of Week**:
+    *   If Gold >= Quota -> `Week++`, New Quota, Generate New Town Pool.
+    *   If Gold < Quota -> Game Over Screen.
+*   **Step 2.4 - UI Updates**: Update Top Bar to show "Day 2/7" and "Quota: 200G".
 
-#### [NEW] [src/quest.js](file:///C:/Users/farha/Project_Tavern_Master/src/quest.js)
-- `Quest` class.
-- Difficulty calculation and compatibility tags (e.g., "Requires FireResist").
+### **Phase 3: Morning Visitors (Narrative)**
+*Objective*: Add "Yes, Your Grace" style dilemmas.
+*   **Step 3.1 - Visitor Event System**: Before the "Recruit" phase starts, check for a Special Visitor.
+*   **Step 3.2 - Dialog UI**: Create a new Overlay/Screen for Conversation (Portrait + Text + 2 Choices).
+*   **Step 3.3 - Integration**:
+    *   Widow: "My husband died." -> Give 50G / Kick Out.
+    *   Guard: "Bribe me." -> Pay 20G / Refuse (Lose Rep).
 
-#### [NEW] [src/game_manager.js](file:///C:/Users/farha/Project_Tavern_Master/src/game_manager.js)
-- Handles the state (Gold, Rep, Day Count).
-- `adventureRegistry`: A Map to store persistent adventurers by ID.
-- logic for `calculateOutcome(adventurer, quest)`.
-- logic for `giftItem(adventurer, item)`: Updates adventurer stats/equipment.
+### **Phase 4: RPG Progression (Veterancy)**
+*Objective*: Make keeping heroes alive valuable.
+*   **Step 4.1 - Leveling**: Add `XP` and `Level` to Adventurer data.
+*   **Step 4.2 - Growth**: On Quest Success, gain XP. Level Up increases STR/DEX/INT.
+*   **Step 4.3 - Visuals**: Add "Level Badge" to Roster Card.
 
-## Verification Plan
+---
 
-### Automated Tests
-- Since this is a vanilla JS project, we will use simple browser-based verification initially.
-- We can add unit tests later if logic becomes complex.
+## 3. Recommended "First Bite"
+**Start with Phase 1 (The Finite Town Pool).**
+It changes the fundamental feeling of the game from "Rolling Dice" to "Managing a Deck". It requires no major UI overhaul, just logic wiring in `index.html` and a new system file.
 
-### Manual Verification
-1.  **Launch**: Open `index.html` in the browser.
-2.  **Visual Check**: Verify the desk, the adventurer, and the quest board appear.
-3.  **Interaction**: Click a Quest, drag to Adventurer, confirm the "Assign" action works.
-4.  **Loop**: End the day (button) and verifying a new day starts with new adventurers.
+**Tasks:**
+1.  Create `js/systems/Town.js`.
+2.  Modify `index.html` to instantiate `TownManager`.
+3.  Modify `Input.js` / `NextAdventurer` logic to pull from `TownManager` instead of `Generator`.
