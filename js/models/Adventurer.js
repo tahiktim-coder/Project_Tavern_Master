@@ -24,7 +24,14 @@ class Adventurer {
 
         // NEW: Guild Member System
         this.isGuildMember = data.isGuildMember || false;
+        this.isCrownRecruit = data.isCrownRecruit || false;
         this.record = data.record || null; // Tracked stats for guild members
+
+        // NEW: Quest History (Detailed service record)
+        this.questHistory = data.questHistory || {
+            total: 0,
+            S: 0, A: 0, B: 0, C: 0, D: 0
+        };
 
         // VISUAL TAGS (Player SAYS these)
         // Derived from stats + random traits

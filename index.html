@@ -10,15 +10,17 @@
     <script src="js/data/traitData.js"></script>
     <script src="js/data/questData.js"></script>
     <script src="js/models/Adventurer.js"></script>
-    <script src="js/systems/Resolution.js"></script>
-    <script src="js/models/VisualTraits.js"></script>
     <script src="js/models/VisualTraits.js"></script>
     <script src="js/systems/Inspector.js"></script>
     <script src="js/systems/Persistence.js"></script>
     <script src="js/systems/Economy.js"></script>
     <script src="js/systems/Input.js"></script>
+    <script src="js/systems/Resolution.js"></script>
     <script src="js/systems/Events.js"></script>
     <script src="js/systems/Town.js"></script>
+    <script src="js/systems/CrownSystem.js"></script> <!-- NEW: Crown System -->
+    <script src="src/data/adventurerData.js"></script>
+    <script src="src/generators/adventurerGenerator.js"></script>
 </head>
 
 <body>
@@ -246,10 +248,16 @@
                     this.drawStartScreen();
                 } else if (gameState.screen === 'GAME') {
                     this.drawGameScreen(gameState);
+                    // Overlay
+                    if (gameState.crownStatusOpen) {
+                        this.drawCrownStatus(gameState);
+                    }
                 } else if (gameState.screen === 'REPORT') {
                     this.drawMorningReportV2(gameState);
                 } else if (gameState.screen === 'ROSTER') {
                     this.drawRosterScreen(gameState);
+                } else if (gameState.screen === 'CROWN_EVENT') {
+                    this.drawMessenger(gameState.crownEvent);
                 }
             }
 
@@ -563,7 +571,13 @@
                         }
 
                         this.ctx.fillStyle = "#e0e0e0";
-                        this.ctx.fillText(m.name, xName, y);
+                        let dispName = m.name;
+                        if (m.isCrownRecruit) dispName = "♔ " + dispName;
+                        if (m.isCrownRecruit) this.ctx.fillStyle = "gold";
+
+                        this.ctx.fillText(dispName, xName, y);
+
+                        this.ctx.fillStyle = "#e0e0e0"; // Reset for class
                         const cls = m.classId ? m.classId.charAt(0).toUpperCase() + m.classId.slice(1) : "Unknown";
                         this.ctx.fillText(`${cls} (${m.level || 1})`, xClass, y);
 
@@ -833,6 +847,33 @@
                 this.ctx.textAlign = "center";
                 this.ctx.fillText("END DAY", 925, 62);
 
+                // UI: Reputation Meter (Left Side)
+                // Draw Wax Seal or Crown Icon
+                const repY = 220; // Moved down from 150 to avoid Roster Button overlap
+                const repX = 40;
+
+                // Icon Background
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.beginPath();
+                this.ctx.arc(repX, repY, 30, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Crown Symbol (Simplified)
+                this.ctx.fillStyle = "gold";
+                this.ctx.font = "24px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText("♔", repX, repY + 8);
+
+                // Value
+                this.ctx.fillStyle = "#fff";
+                this.ctx.font = "bold 14px monospace";
+                this.ctx.fillText(gameState.reputation || 50, repX, repY + 45);
+
+                // Label
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.font = "10px monospace";
+                this.ctx.fillText("REP", repX, repY + 55);
+
 
                 // UI: Action Buttons (Bottom Center Area)
                 // Only if Hero exists
@@ -900,6 +941,14 @@
                     this.drawDraggedQuest(gameState.dragState);
                 }
 
+                // CROWN EVENT OVERLAY
+                if (gameState.screen === 'CROWN_EVENT' && gameState.crownEvent) {
+                    this.drawMessenger(gameState.crownEvent);
+                    return; // Stop drawing other overlays? Or draw on top.
+                }
+
+                // Draw Report Overlay
+
                 // Draw Report Overlay
                 if (gameState.report) {
                     this.drawReportCard(gameState.report);
@@ -916,7 +965,102 @@
                 }
 
                 // DEBUG OVERLAYS (User Request)
-                this.drawDebugOverlays(gameState);
+                // DEBUG OVERLAYS (Removed - See debug_ui_reference.md)
+                // this.drawDebugOverlays(gameState);
+            }
+
+            drawMessenger(crownEvent) {
+                // Safety
+                if (!crownEvent) return;
+
+                const cx = this.width / 2;
+                const cy = this.height / 2;
+                const w = 600;
+                const h = 450;
+
+                // 1. Overlay (Dim Background)
+                this.ctx.fillStyle = "rgba(0,0,0,0.85)";
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // 2. Parchment
+                this.ctx.fillStyle = "#f3e5ab";
+                this.ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+                this.ctx.strokeStyle = "#8b4513";
+                this.ctx.lineWidth = 8;
+                this.ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+
+                // 3. Crown Icon
+                this.ctx.fillStyle = "gold";
+                this.ctx.beginPath();
+                this.ctx.arc(cx, cy - h / 2 + 50, 30, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = "#b8860b"; // Dark Gold
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // 4. Title
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.textAlign = "center";
+                this.ctx.font = "bold 32px 'MedievalSharp'";
+                this.ctx.fillText("Messenger of the Crown", cx, cy - h / 2 + 100);
+
+                // 5. Content
+                this.ctx.font = "20px 'MedievalSharp'";
+                let y = cy - h / 2 + 140;
+
+                if (crownEvent.type === 'MESSENGER_VISIT') {
+                    if (crownEvent.events) {
+                        crownEvent.events.forEach(ev => {
+                            if (ev.type === 'EVALUATION') {
+                                this.ctx.fillStyle = ev.result === 'SUCCESS' ? "green" : "red";
+                                this.ctx.fillText(ev.msg || "Evaluation Complete", cx, y);
+                                y += 40;
+                            } else if (ev.type === 'ASSIGNMENT') {
+                                this.ctx.fillStyle = "#3e2723";
+                                this.ctx.font = "bold 24px 'MedievalSharp'";
+                                this.ctx.fillText("ROYAL DECREE:", cx, y);
+                                y += 35;
+
+                                if (ev.quest) {
+                                    this.ctx.font = "italic 22px 'MedievalSharp'";
+                                    this.ctx.fillText(ev.quest.title || "Unknown Task", cx, y);
+                                    y += 30;
+
+                                    this.ctx.font = "18px monospace";
+                                    const desc = ev.quest.description || "No description.";
+                                    const words = desc.split(' ');
+                                    let line = '';
+                                    words.forEach(word => {
+                                        if (this.ctx.measureText(line + word).width > 500) {
+                                            this.ctx.fillText(line, cx, y);
+                                            y += 20;
+                                            line = word + ' ';
+                                        } else {
+                                            line += word + ' ';
+                                        }
+                                    });
+                                    this.ctx.fillText(line, cx, y);
+                                    y += 40;
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    this.ctx.fillStyle = "red";
+                    this.ctx.fillText(crownEvent.reason || "Event Error", cx, y);
+                }
+
+                // 6. Button
+                const btnY = cy + 140; // Fixed Base
+                this.ctx.fillStyle = "#5d4037";
+                this.ctx.fillRect(cx - 100, btnY, 200, 50);
+                this.ctx.strokeStyle = "gold";
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(cx - 100, btnY, 200, 50);
+
+                this.ctx.fillStyle = "#fff";
+                this.ctx.font = "bold 20px 'MedievalSharp'";
+                this.ctx.fillText("I UNDERSTAND", cx, btnY + 32);
             }
 
             drawStamp(stamp) {
@@ -999,89 +1143,96 @@
                 this.ctx.restore();
             }
 
-            drawDebugOverlays(gameState) {
-                if (gameState.screen !== 'GAME') return;
+            drawCrownStatus(gameState) {
+                // Dim Background
+                this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                this.ctx.fillRect(0, 0, this.width, this.height);
 
-                this.ctx.save();
-                this.ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
-                this.ctx.lineWidth = 2;
-                this.ctx.font = "12px monospace";
-                this.ctx.fillStyle = "red";
-
-                const drawBox = (x, y, w, h, label) => {
-                    this.ctx.strokeRect(x, y, w, h);
-                    this.ctx.fillText(label, x + 5, y + 15);
-                };
-
-                // 0. DROP ZONE DEBUG (Green - Matches Portrait Frame)
-                // 0. DROP ZONE DEBUG (Green - Matches Portrait Frame)
-                const dcx = this.width / 2;
-                const dcy = this.height / 2 - 100;
-                // Dynamic: Matches visual code exactly
-                this.ctx.strokeStyle = "#00FF00";
-                this.ctx.strokeRect(dcx - 120, dcy - 120, 240, 240);
-                this.ctx.fillStyle = "#00FF00";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText("DROP ZONE", dcx, dcy - 120);
-
-                // Reset to Red
-                this.ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
-                this.ctx.fillStyle = "red";
-                this.ctx.textAlign = "left";
-
-                // 1. Roster Button
-                drawBox(10, 115, 180, 50, "ROSTER");
-
-                // DEBUG ROSTER LIST (Top Right)
-                if (gameState.persistence && gameState.persistence.roster) {
-                    let dy = 100;
-                    this.ctx.textAlign = "right";
-                    this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-                    this.ctx.fillRect(this.width - 320, 80, 310, 300);
-
-                    this.ctx.fillStyle = "white";
-                    this.ctx.font = "14px monospace";
-                    this.ctx.fillText("--- GUILD ROSTER DEBUG ---", this.width - 10, dy);
-                    dy += 20;
-
-                    let count = 0;
-                    for (const [id, adv] of gameState.persistence.roster.entries()) {
-                        let status = adv.isAssigned ? "BUSY" : "FREE";
-                        if (adv.isDead) status = "DEAD";
-                        else if (adv.injuries && adv.injuries.length > 0) status = "INJURED";
-                        else if (adv.lastSeenDay === gameState.day) status = "SEEN";
-
-                        const col = status === "BUSY" ? "red" : (status === "DEAD" ? "black" : (status === "INJURED" ? "orange" : (status === "SEEN" ? "gray" : "#00FF00")));
-                        this.ctx.fillStyle = col;
-                        // Show Name, last 4 chars of ID, and Status
-                        const txt = `${adv.name.substr(0, 8)}.. [..${id.substr(-4)}] : ${status}`;
-                        this.ctx.fillText(txt, this.width - 10, dy);
-                        dy += 20;
-                        count++;
-                        if (count > 12) break; // Limit list
-                    }
-                    if (gameState.town) {
-                        this.ctx.fillStyle = "cyan";
-                        this.ctx.fillText(`Town Queue: ${gameState.town.dailyQueue ? gameState.town.dailyQueue.length : 0}`, this.width - 10, dy + 20);
-                    }
-                    this.ctx.textAlign = "left"; // Reset
-                }
-                drawBox(860, 30, 130, 50, "END DAY");
-
-                // 3. Recruit (Hitbox)
-                drawBox(302, 560, 200, 60, "RECRUIT");
-
-                // 4. Dismiss (Hitbox)
-                drawBox(522, 560, 200, 60, "DISMISS");
-
-                // 5. Inspection (Center)
+                // Modal
+                const w = 500;
+                const h = 400;
                 const cx = this.width / 2;
-                // Visual Center calculated: h/2 - 100
-                const inspectCy = this.height / 2 - 100;
-                drawBox(cx - 120, inspectCy - 120, 240, 240, "INSPECT (R-CLICK)");
+                const cy = this.height / 2;
 
-                this.ctx.restore();
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+                this.ctx.strokeStyle = "gold";
+                this.ctx.lineWidth = 4;
+                this.ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+
+                // Header
+                this.ctx.fillStyle = "gold";
+                this.ctx.font = "bold 28px 'MedievalSharp'";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText("Royal Standing", cx, cy - h / 2 + 50);
+
+                // Reputation
+                this.ctx.fillStyle = "#fff";
+                this.ctx.font = "24px monospace";
+                this.ctx.fillText(`Reputation: ${gameState.reputation || 50}/100`, cx, cy - h / 2 + 90);
+
+                // Active Quest
+                this.ctx.fillStyle = "#f3e5ab"; // Parchment color used for text box
+                this.ctx.fillRect(cx - w / 2 + 20, cy - h / 2 + 120, w - 40, h - 200);
+
+                this.ctx.fillStyle = "#000";
+                this.ctx.textAlign = "center";
+
+                if (gameState.crown && gameState.crown.activeQuest) {
+                    const q = gameState.crown.activeQuest;
+                    this.ctx.font = "bold 22px 'MedievalSharp'";
+                    this.ctx.fillText(q.title || "Unknown Quest", cx, cy - h / 2 + 160);
+
+                    this.ctx.font = "16px monospace";
+                    this.ctx.fillText(`Rank: ${q.rank} | Type: ${q.type}`, cx, cy - h / 2 + 190);
+
+                    // Progress
+                    let progressText = "In Progress";
+                    if (q.type === 'TALENT_SCOUT') {
+                        const targetNum = (q.target && q.target.requiredWins) ? q.target.requiredWins : 3;
+                        let currentProgress = q.progress || 0;
+
+                        // Dynamic Lookup (More Robust)
+                        if (q.targetRecruitId && gameState.persistence) {
+                            const heroData = gameState.persistence.roster.get(q.targetRecruitId);
+                            if (heroData && heroData.questHistory) {
+                                currentProgress = heroData.questHistory.total || 0;
+                            }
+                        }
+
+                        progressText = `Progress: ${currentProgress} / ${targetNum} Quests`;
+                        if (q.targetRecruitName) {
+                            progressText += ` (Hero: ${q.targetRecruitName})`;
+                        }
+                    } else if (q.type === 'MANDATE') {
+                        progressText = "Objective: Complete Quest";
+                    }
+
+                    this.ctx.font = "bold 20px monospace";
+                    this.ctx.fillStyle = "#2e7d32";
+                    this.ctx.fillText(progressText, cx, cy - h / 2 + 230);
+
+                    // Expiry
+                    if (gameState.crown.nextVisitDay) {
+                        const daysLeft = gameState.crown.nextVisitDay - gameState.day;
+                        this.ctx.fillStyle = "#d32f2f";
+                        this.ctx.font = "18px monospace";
+                        this.ctx.fillText(`Days Remaining: ${daysLeft}`, cx, cy - h / 2 + 270);
+                    }
+
+                } else {
+                    this.ctx.font = "italic 20px monospace";
+                    this.ctx.fillStyle = "#555";
+                    this.ctx.fillText("No active Royal Directives.", cx, cy - h / 2 + 200);
+                }
+
+                // Close Hint
+                this.ctx.fillStyle = "#aaa";
+                this.ctx.font = "14px monospace";
+                this.ctx.fillText("[Click Reputation Icon to Close]", cx, cy + h / 2 - 20);
             }
+
+            // Debug Overlays Removed (See debug_ui_reference.md)
 
             drawInspectionWindow(data) {
                 const x = 50;
@@ -1596,6 +1747,12 @@
         let gameState = {
             screen: 'START', // START, GAME, REPORT
             day: 1,
+            reputation: 50, // CROWN REPUTATION (0-100)
+            crown: {
+                nextVisitDay: 3,
+                activeQuest: null,
+                history: []
+            },
             currentAdventurer: null,
             pendingReports: [] // Stores results from the day
         };
@@ -1612,6 +1769,23 @@
             // RESET DAILY ASSIGNMENTS (User Fix)
             if (gameState.persistence) {
                 gameState.persistence.resetDailyState();
+            }
+
+            // CROWN CHECK (Day 7 Loop)
+            if (window.GameSystems.CrownSystem && !gameState.crownSystem) {
+                gameState.crownSystem = new window.GameSystems.CrownSystem();
+            }
+            if (gameState.crownSystem) {
+                // Safety: Ensure data exists
+                if (!gameState.crown) gameState.crown = { nextVisitDay: 3, activeQuest: null, history: [] };
+
+                const crownEvent = gameState.crownSystem.checkDaily(gameState);
+                if (crownEvent) {
+                    gameState.crownEvent = crownEvent; // Store event to Render
+                    gameState.screen = 'CROWN_EVENT'; // Block game until resolved
+                    console.log("Crown Event Triggered:", crownEvent);
+                    return; // PAUSE day start until event handled
+                }
             }
 
             // Generate Adventurer (OLD)
@@ -1637,8 +1811,19 @@
             // Load Quests (from Data Layer)
             if (window.GameData && window.GameData.Quests) {
                 // Shuffle and pick 3-6
+                // Shuffle and pick 3-6
                 const count = Math.floor(Math.random() * 4) + 3;
                 gameState.quests = [...window.GameData.Quests].sort(() => 0.5 - Math.random()).slice(0, count);
+
+                // FIX: Re-inject Active Crown Mandate (if lost during shuffle)
+                if (gameState.crown && gameState.crown.activeQuest && gameState.crown.activeQuest.type === 'MANDATE') {
+                    const mandate = gameState.crown.activeQuest;
+                    // Check if completed/failed? handled by Resolution.
+                    if (mandate.status !== 'COMPLETED' && mandate.status !== 'FAILED') {
+                        // Add to top of board
+                        gameState.quests.unshift(mandate);
+                    }
+                }
             } else {
                 console.warn("Quests not loaded!");
                 gameState.quests = [];
@@ -1655,6 +1840,7 @@
             gameState.persistence = new window.GameSystems.PersistenceManager(); // NEW
             gameState.events = new window.GameSystems.EventManager(); // NEW
             gameState.town = new window.GameSystems.TownManager(); // NEW
+            gameState.crownSystem = new window.GameSystems.CrownSystem(); // NEW: Crown Logic
             const input = new window.GameSystems.InputController(canvas, gameState);
 
             // Event: Next Adventurer (Same Day)
@@ -1742,7 +1928,7 @@
                 const activeCount = rosterArr.filter(m => !m.isDead).length;
 
                 if (activeCount >= 12) {
-                    alert("Guild is full! (Max 12 active members). Dismiss someone or wait for... accidents.");
+                    alert(`Guild is full! Active Members: ${activeCount}/12. (Deceased members do not count). Dismiss someone to hire more.`);
                     return;
                 }
 
@@ -1752,6 +1938,18 @@
                 // Recruit THIS adventurer
                 hero.isGuildMember = true;
                 gameState.town.recruit(hero.id); // Remove from Town Pool
+
+                // CROWN QUEST LOGIC: TALENT SCOUT
+                if (gameState.crown && gameState.crown.activeQuest && gameState.crown.activeQuest.type === 'TALENT_SCOUT') {
+                    // Mark this recruit for the quest (ID BASED)
+                    if (!gameState.crown.activeQuest.targetRecruitId) {
+                        gameState.crown.activeQuest.targetRecruitId = hero.id;
+                        gameState.crown.activeQuest.targetRecruitName = hero.name;
+                        console.log("Crown Quest Tracked ID:", hero.id);
+                    }
+                    hero.isCrownRecruit = true; // Keep visual tag
+                    console.log("Recruited Crown Candidate:", hero.name);
+                }
 
                 // Add to Roster Persistence
                 gameState.persistence.addToRoster(hero);
@@ -1769,6 +1967,26 @@
                 if (gameState.persistence) {
                     gameState.persistence.addToRoster(hero);
                 }
+            });
+
+            // Toggle Crown Status
+            document.addEventListener('toggleCrownStatus', () => {
+                gameState.crownStatusOpen = !gameState.crownStatusOpen;
+                // Loop handles redraw
+            });
+
+            // Resume Day (Continue after Crown Event)
+            document.addEventListener('resumeDay', () => {
+                // Determine if we need to advance logic or just resume
+                // Crown Event in startNewDay returns early.
+                // So we should call startNewDay() again to proceed with Daily Logic.
+                // But we must ensure specific flags don't trigger again.
+                // startNewDay uses gameState.day.
+                // If we call it again, it checks Crown.
+                // checkDaily checks 'nextVisitDay'.
+                // If handleVisit updated nextVisitDay (it did), then checkDaily returns null.
+                // So startNewDay proceeds to Normal Daily Logic.
+                startNewDay();
             });
 
             // Event: Toggle Roster

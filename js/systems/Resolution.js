@@ -135,6 +135,44 @@ class ResolutionManager {
 
         console.log(`Resolution: Gold calculation - Base: ${baseReward}, Earned: ${goldEarned}`);
 
+        // 3.6 UPDATE HISTORY & CROWN QUEST
+        if (adventurer.questHistory) {
+            adventurer.questHistory.total++;
+            const rank = quest.rank || 'C';
+            // Init byRank if missing
+            if (!adventurer.questHistory.byRank) adventurer.questHistory.byRank = { S: 0, A: 0, B: 0, C: 0, D: 0 };
+
+            if (result === 'SUCCESS') {
+                if (adventurer.questHistory.byRank[rank] !== undefined) {
+                    adventurer.questHistory.byRank[rank]++;
+                }
+            }
+        }
+
+        // CROWN QUEST CHECK
+        if (window.gameState && window.gameState.crown && window.gameState.crown.activeQuest) {
+            const cQuest = window.gameState.crown.activeQuest;
+            if (cQuest.type === 'TALENT_SCOUT') {
+                // Check if this is the target recruit (ID Match OR Flag match fallback)
+                // Using ID is safer against persistence flag loss.
+                const isTarget = (cQuest.targetRecruitId && cQuest.targetRecruitId === adventurer.id) || adventurer.isCrownRecruit;
+
+                if (isTarget) {
+                    if (result === 'SUCCESS' || result === 'MIXED') {
+                        cQuest.progress = (cQuest.progress || 0) + 1;
+                        console.log(`Crown Quest Progress: ${cQuest.progress}/${cQuest.target.requiredWins}`);
+                    }
+                }
+            } else if (cQuest.type === 'MANDATE' && cQuest.isCrownQuest) {
+                // If this WAS the crown quest
+                // Note: Crown Quests need to be matched by ID or Tag
+                if (quest.id === cQuest.id && (result === 'SUCCESS' || result === 'MIXED')) {
+                    cQuest.status = 'COMPLETED';
+                    console.log("Crown Mandate Completed!");
+                }
+            }
+        }
+
         // 3.6 PERSISTENCE SAVE (Optional)
         try {
             if (window.gameState && window.gameState.persistence) {
@@ -143,6 +181,10 @@ class ResolutionManager {
                     questTitle: quest.title,
                     result: result
                 });
+
+                // SAVE GLOBAL STATE (Crown Progress)
+                window.gameState.persistence.saveGlobal(window.gameState);
+
             } else {
                 console.log("Resolution: Persistence system not available, skipping save");
             }

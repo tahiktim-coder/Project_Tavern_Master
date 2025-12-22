@@ -39,6 +39,11 @@ class InputController {
         this.mouse.y = pos.y;
 
         // ROUTING
+        if (this.gameState.screen === 'CROWN_EVENT') {
+            this.handleCrownInput(pos);
+            return;
+        }
+
         if (this.gameState.screen === 'ROSTER') {
             this.handleRosterInput(pos);
             return;
@@ -100,6 +105,15 @@ class InputController {
         // CHECK 0.4: Roster Button (Top Left - Under Day)
         if (pos.x >= 10 && pos.x <= 190 && pos.y >= 115 && pos.y <= 165) {
             const event = new CustomEvent('toggleRoster');
+            document.dispatchEvent(event);
+            return;
+        }
+
+        // CHECK 0.45: Crown Reputation Meter (Click to see Status)
+        // Coords: 40, 220, Radius 30 => Box [10, 190] // 30+30=60 width. 
+        // Box: x[10, 70], y[190, 250]
+        if (pos.x >= 10 && pos.x <= 70 && pos.y >= 190 && pos.y <= 250) {
+            const event = new CustomEvent('toggleCrownStatus');
             document.dispatchEvent(event);
             return;
         }
@@ -390,8 +404,27 @@ class InputController {
             }
         }
     }
+    handleCrownInput(pos) {
+        // Button is Centered, approx y=Height/2 + 100
+        const cx = this.canvas.width / 2;
+        const cy = this.canvas.height / 2;
+        const btnY = cy + 120;
+        const btnW = 200;
+        const btnH = 50;
+
+        // "CONTINUE / ACCEPT" Button
+        if (pos.x >= cx - btnW / 2 && pos.x <= cx + btnW / 2 &&
+            pos.y >= btnY && pos.y <= btnY + btnH) {
+
+            this.gameState.crownEvent = null;
+            this.gameState.screen = 'GAME'; // Reset screen
+
+            // Resume Day (Re-trigger startNewDay which will now skip the Crown Check)
+            // We need to trigger this globally.
+            // Dispatch Event
+            document.dispatchEvent(new CustomEvent('resumeDay'));
+        }
+    }
 }
-
-
 
 window.GameSystems.InputController = InputController;

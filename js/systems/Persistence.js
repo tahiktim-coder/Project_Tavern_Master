@@ -29,7 +29,9 @@ class PersistenceManager {
             traits: [...adventurer.traits],
             visuals: adventurer.visuals ? [...adventurer.visuals] : [],
             history: adventurer.history || [],
+            questHistory: adventurer.questHistory || { total: 0, S: 0, A: 0, B: 0, C: 0, D: 0 },
             isGuildMember: adventurer.isGuildMember || false,
+            isCrownRecruit: adventurer.isCrownRecruit || false,
             injuries: adventurer.injuries || []
         };
     }
@@ -46,7 +48,9 @@ class PersistenceManager {
             data.stats = { ...adventurer.stats };
             data.traits = [...adventurer.traits];
             data.isGuildMember = adventurer.isGuildMember;
+            data.isCrownRecruit = adventurer.isCrownRecruit;
             data.injuries = adventurer.injuries || [];
+            data.questHistory = adventurer.questHistory || data.questHistory;
         }
 
         // Update based on Result
@@ -120,6 +124,36 @@ class PersistenceManager {
         const idx = Math.floor(Math.random() * candidates.length);
         const data = candidates[idx];
         return data; // Returns DATA object.
+    }
+
+    // --- GLOBAL SAVE/LOAD (New) ---
+    saveGlobal(gameState) {
+        if (!gameState) return;
+        const data = {
+            day: gameState.day,
+            gold: gameState.economy ? gameState.economy.gold : 0,
+            reputation: gameState.reputation,
+            crown: gameState.crown,
+            roster: Array.from(this.roster.entries())
+        };
+        localStorage.setItem('tavernMasterSave', JSON.stringify(data));
+        console.log("Game Saved to LocalStorage");
+    }
+
+    loadGlobal() {
+        const raw = localStorage.getItem('tavernMasterSave');
+        if (!raw) return null;
+        try {
+            const data = JSON.parse(raw);
+            // Restore Roster Map
+            if (data.roster) {
+                this.roster = new Map(data.roster);
+            }
+            return data;
+        } catch (e) {
+            console.error("Failed to load save:", e);
+            return null;
+        }
     }
 }
 

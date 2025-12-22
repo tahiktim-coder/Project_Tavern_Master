@@ -28,6 +28,20 @@ class Inspector {
             descriptions.push("Nothing remarkable stands out.");
         }
 
+        // Add Quest History
+        if (adventurer.questHistory) {
+            descriptions.push("--- SERVICE RECORD ---");
+            descriptions.push(`Total Missions: ${adventurer.questHistory.total}`);
+            if (adventurer.questHistory.byRank) {
+                const r = adventurer.questHistory.byRank;
+                if (r.S > 0) descriptions.push(`Rank S: ${r.S}`);
+                if (r.A > 0) descriptions.push(`Rank A: ${r.A}`);
+                if (r.B > 0) descriptions.push(`Rank B: ${r.B}`);
+                if (r.C > 0) descriptions.push(`Rank C: ${r.C}`);
+                if (r.D > 0) descriptions.push(`Rank D: ${r.D}`);
+            }
+        }
+
         return {
             name: adventurer.name,
             details: descriptions
