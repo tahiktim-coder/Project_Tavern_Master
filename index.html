@@ -15,6 +15,7 @@
     <script src="js/systems/Persistence.js"></script>
     <script src="js/systems/Economy.js"></script>
     <script src="js/systems/Input.js"></script>
+    <script src="js/systems/CrownChecker.js"></script>
     <script src="js/systems/Resolution.js"></script>
     <script src="js/systems/Events.js"></script>
     <script src="js/systems/Town.js"></script>
@@ -579,7 +580,7 @@
 
                         this.ctx.fillStyle = "#e0e0e0"; // Reset for class
                         const cls = m.classId ? m.classId.charAt(0).toUpperCase() + m.classId.slice(1) : "Unknown";
-                        this.ctx.fillText(`${cls} (${m.level || 1})`, xClass, y);
+                        this.ctx.fillText(`Lvl ${m.level || 1} ${cls}`, xClass, y);
 
                         // Status Color
                         let status = "Ready";
@@ -651,6 +652,27 @@
                 if (portrait) {
                     this.ctx.drawImage(portrait, px, py, pSize, pSize);
                 }
+
+                // XP BAR & LEVEL (NEW)
+                const xpY = py + pSize + 15;
+                const xpW = pSize;
+                const xpH = 12;
+                const curXp = member.xp || 0;
+                const reqXp = member.xpToNextLevel || 100;
+                const lvl = member.level || 1;
+                const pct = Math.min(1, curXp / reqXp);
+
+                // Bar BG
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.fillRect(px, xpY, xpW, xpH);
+                // Bar Fill
+                this.ctx.fillStyle = "#76ff03"; // Green
+                this.ctx.fillRect(px, xpY, xpW * pct, xpH);
+                // Text
+                this.ctx.fillStyle = "#ffd54f"; // Gold text
+                this.ctx.font = "bold 14px monospace";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText(`Lvl ${lvl} (${curXp}/${reqXp} XP)`, px + xpW / 2, xpY + 30);
 
                 // Stats (Right)
                 this.ctx.textAlign = "left";
@@ -1205,7 +1227,13 @@
                             progressText += ` (Hero: ${q.targetRecruitName})`;
                         }
                     } else if (q.type === 'MANDATE') {
-                        progressText = "Objective: Complete Quest";
+                        const isDone = q.status === 'COMPLETED';
+                        progressText = `Progress: ${isDone ? 1 : 0} / 1`;
+                        if (isDone) {
+                            progressText += " (COMPLETED)";
+                        } else {
+                            progressText += " (Objective: Complete Quest)";
+                        }
                     }
 
                     this.ctx.font = "bold 20px monospace";

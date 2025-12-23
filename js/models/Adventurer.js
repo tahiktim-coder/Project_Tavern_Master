@@ -33,6 +33,14 @@ class Adventurer {
             S: 0, A: 0, B: 0, C: 0, D: 0
         };
 
+        // NEW: Leveling System
+        this.level = data.level || 1;
+        this.xp = data.xp || 0;
+        this.xpToNextLevel = data.xpToNextLevel || 100;
+        // Hidden Potential: 0.8 to 1.2 multiplier for stat growth.
+        // If loading data, keep it. If new, generate it.
+        this.potential = data.potential || (0.8 + Math.random() * 0.4);
+
         // VISUAL TAGS (Player SAYS these)
         // Derived from stats + random traits
         this.visuals = [];
@@ -90,8 +98,56 @@ class Adventurer {
 
         // Add a random generic visual if empty, just for flavor
         if (this.visuals.length === 0) {
-            this.visuals.push("neutral");
+            this.visuals.push("determined_look");
         }
+    }
+
+    gainXp(amount) {
+        this.xp += amount;
+        let leveledUp = false;
+        // Cap level at 20 prevents infinite loops or absurdity
+        while (this.xp >= this.xpToNextLevel && this.level < 20) {
+            this.xp -= this.xpToNextLevel;
+            this.levelUp();
+            leveledUp = true;
+        }
+        return leveledUp;
+    }
+
+    levelUp() {
+        this.level++;
+        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.5);
+
+        // Stat Growth Logic
+        const mult = this.potential || 1.0;
+        const growth = { str: 0, dex: 0, int: 0, wis: 0, cha: 0, vit: 0 };
+
+        // Define Class Focus
+        switch (this.classId) {
+            case 'Warrior': growth.str = 2; growth.vit = 2; break;
+            case 'Mage': growth.int = 2; growth.wis = 2; break;
+            case 'Rogue': growth.dex = 2; growth.cha = 1; break;
+            case 'Cleric': growth.wis = 2; growth.cha = 2; break;
+            case 'Ranger': growth.dex = 2; growth.vit = 1; break;
+            case 'Paladin': growth.str = 1; growth.wis = 2; break;
+            default: // Random spread for unknown classes
+                growth.str = 1; growth.dex = 1; growth.int = 1;
+        }
+
+        // Apply Growth
+        for (const stat in growth) {
+            if (growth[stat] > 0) {
+                // Formula: Base * Potential * Variance
+                const val = growth[stat] * mult * (0.5 + Math.random());
+                this.stats[stat] = (this.stats[stat] || 0) + Math.max(1, Math.floor(val));
+            } else {
+                // Small chance for off-stat growth
+                if (Math.random() < 0.15 * mult) {
+                    this.stats[stat] = (this.stats[stat] || 0) + 1;
+                }
+            }
+        }
+        console.log(`${this.name} leveled up to ${this.level}!`);
     }
 }
 

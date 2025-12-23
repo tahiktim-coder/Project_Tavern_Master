@@ -17,6 +17,11 @@ class Inspector {
         const visuals = adventurer.visuals;
         const descriptions = [];
 
+        // NEW: Level & XP
+        descriptions.push(`Level: ${adventurer.level || 1}`);
+        descriptions.push(`XP: ${adventurer.xp || 0} / ${adventurer.xpToNextLevel || 100}`);
+        descriptions.push("----------------");
+
         visuals.forEach(tag => {
             const text = window.GameData.VisualTraits[tag];
             if (text) {

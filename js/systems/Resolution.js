@@ -149,28 +149,28 @@ class ResolutionManager {
             }
         }
 
-        // CROWN QUEST CHECK
-        if (window.gameState && window.gameState.crown && window.gameState.crown.activeQuest) {
-            const cQuest = window.gameState.crown.activeQuest;
-            if (cQuest.type === 'TALENT_SCOUT') {
-                // Check if this is the target recruit (ID Match OR Flag match fallback)
-                // Using ID is safer against persistence flag loss.
-                const isTarget = (cQuest.targetRecruitId && cQuest.targetRecruitId === adventurer.id) || adventurer.isCrownRecruit;
+        // 3.5 XP & LEVEL UP (NEW)
+        if (result === 'SUCCESS' || result === 'MIXED') {
+            const xpMap = { 'D': 50, 'C': 100, 'B': 250, 'A': 500, 'S': 1000 };
+            const xp = xpMap[quest.rank] || 50;
 
-                if (isTarget) {
-                    if (result === 'SUCCESS' || result === 'MIXED') {
-                        cQuest.progress = (cQuest.progress || 0) + 1;
-                        console.log(`Crown Quest Progress: ${cQuest.progress}/${cQuest.target.requiredWins}`);
-                    }
-                }
-            } else if (cQuest.type === 'MANDATE' && cQuest.isCrownQuest) {
-                // If this WAS the crown quest
-                // Note: Crown Quests need to be matched by ID or Tag
-                if (quest.id === cQuest.id && (result === 'SUCCESS' || result === 'MIXED')) {
-                    cQuest.status = 'COMPLETED';
-                    console.log("Crown Mandate Completed!");
+            // Safety check for method existence (in case of old instances)
+            if (typeof adventurer.gainXp === 'function') {
+                const leveledUp = adventurer.gainXp(xp);
+                log.push(`Gained ${xp} XP.`);
+                if (leveledUp) {
+                    log.push(`*** LEVEL UP! Reached Level ${adventurer.level}! ***`);
+                    flavorText += ` ${adventurer.name} feels stronger!`;
                 }
             }
+        }
+
+        // CROWN QUEST CHECK
+        if (window.GameSystems.CrownChecker) {
+            // DELEGATE TO DEDICATED CHECKER
+            window.GameSystems.CrownChecker.check(window.gameState, quest, adventurer, result);
+        } else {
+            console.error("Resolution: CrownChecker system not found!");
         }
 
         // 3.6 PERSISTENCE SAVE (Optional)
