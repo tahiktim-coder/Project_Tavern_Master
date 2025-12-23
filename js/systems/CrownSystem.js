@@ -90,40 +90,19 @@ class CrownSystem {
     }
 
     generateQuest(gameState) {
-        // FIRST VISIT: TALENT SCOUT
-        // If Roster is small (e.g. < 3) or it's early Game
-        // Logic: specific override for first time? 
-        // User requested: "First quest would be 1 new member"
-
-        // Let's implement randomness later. For now, strict sequence or random.
-        // We'll use a simple flag or check turn count.
-
-        if (gameState.day <= 7) {
-            return {
-                id: `crown_${gameState.day}_talent`,
-                type: 'TALENT_SCOUT',
-                title: "Royal Decree: Expansion",
-                description: "The town is in dire need of permanent protectors. Recruit a new Guild Member and ensure they survive 3 quests.",
-                rank: 'B',
-                target: { requiredWins: 3 },
-                progress: 0,
-                deadlineDay: gameState.day + 7,
-                isCrownQuest: true
-            };
-        } else {
-            // STANDARD MANDATE (Placeholder for regular high-dif quest)
-            return {
-                id: `crown_${gameState.day}_mandate`,
-                type: 'MANDATE',
-                title: "Royal Mandate: Beast Hunt",
-                description: "A dangerous beast threatens the trade routes. Eradicate it.",
-                rank: 'A',
-                target: { type: 'HUNT' },
-                status: 'PENDING',
-                deadlineDay: gameState.day + 7,
-                isCrownQuest: true
-            };
-        }
+        // ALWAYS TALENT SCOUT (Expansion)
+        // The Crown demands growth.
+        return {
+            id: `crown_${gameState.day}_talent`,
+            type: 'TALENT_SCOUT',
+            title: "Royal Decree: Expansion",
+            description: "The town is in dire need of permanent protectors. Recruit a new Guild Member and ensure they survive 3 quests.",
+            rank: 'B', // Moderate difficulty
+            target: { requiredWins: 3 },
+            progress: 0,
+            deadlineDay: gameState.day + 7,
+            isCrownQuest: true
+        };
     }
 }
 

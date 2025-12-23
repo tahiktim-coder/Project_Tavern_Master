@@ -368,7 +368,11 @@ class InputController {
                     if (this.gameState.economy.gold >= 50) {
                         this.gameState.economy.gold -= 50;
                         member.injuries = []; // Initial Cure All
+                        // Remove 'Injured' trait if present
+                        if (member.traits) member.traits = member.traits.filter(t => t !== 'Injured');
                         alert("Healed " + member.name + " for 50 Gold.");
+                        // Force Save
+                        if (this.gameState.persistence) this.gameState.persistence.saveAdventurer(member, { result: 'HEALED', questTitle: 'Infirmary' });
                     } else {
                         alert("Not enough gold (Need 50).");
                     }
@@ -381,27 +385,55 @@ class InputController {
                 const member = this.gameState.rosterDetailMember;
                 const confirm = window.confirm("Fire " + member.name + "?");
                 if (confirm) {
-                    this.gameState.persistence.removeFromRoster(member.id);
+                    // FIX: Use correctly implemented removeFromRoster
+                    if (this.gameState.persistence && this.gameState.persistence.removeFromRoster) {
+                        this.gameState.persistence.removeFromRoster(member.id);
+                    } else {
+                        // Fallback check (should not be needed now)
+                        this.gameState.persistence.roster.delete(member.id);
+                    }
                     this.gameState.rosterDetailMember = null;
                 }
                 return;
             }
 
-            // Click outside to close
+            // Click outside to close (Modal only)
             if (pos.x < x || pos.x > x + w || pos.y < y || pos.y > y + h) {
                 this.gameState.rosterDetailMember = null;
             }
             return;
         }
 
-        // List View - Click Row
+        // List View Logic
+
+        // 1. Check "Roster Button" Area (To verify closing)
+        // Coords match Main Input: 10, 115, 180W, 50H (Box: 10-190, 115-165)
+        if (pos.x >= 10 && pos.x <= 190 && pos.y >= 115 && pos.y <= 165) {
+            const event = new CustomEvent('toggleRoster');
+            document.dispatchEvent(event);
+            return;
+        }
+
+        // 2. Click Row
         // Rows start at Y=150, Height=40
-        if (pos.y >= 150) {
-            const index = Math.floor((pos.y - 150) / 40);
+        const headerH = 150;
+        const rowH = 40;
+
+        if (pos.y >= headerH) {
+            const index = Math.floor((pos.y - headerH) / rowH);
             const roster = Array.from(this.gameState.persistence.roster.values());
+
             if (index >= 0 && index < roster.length) {
                 this.gameState.rosterDetailMember = roster[index];
+            } else {
+                // Clicked Empty Space (Below list) --> CLOSE ROSTER
+                // This makes navigation much more intuitive (Click out to close)
+                const event = new CustomEvent('toggleRoster');
+                document.dispatchEvent(event);
             }
+        } else {
+            // Clicked Above Header (but not on Button) -> Also Close?
+            // Maybe. Let's keep it simple.
         }
     }
     handleCrownInput(pos) {

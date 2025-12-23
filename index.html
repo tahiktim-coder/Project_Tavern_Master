@@ -2058,71 +2058,10 @@
             // Mouse Click for Start and Report
             canvas.addEventListener('click', (e) => { // Captured e
                 if (gameState.screen === 'START') startGame();
+                // ROSTER Handled by Input.js
                 else if (gameState.screen === 'ROSTER') {
-                    if (gameState.rosterOpenedAt && Date.now() - gameState.rosterOpenedAt < 300) return;
-
-                    const rect = canvas.getBoundingClientRect();
-                    const scaleX = canvas.width / rect.width;
-                    const scaleY = canvas.height / rect.height;
-                    const x = (e.clientX - rect.left) * scaleX;
-                    const y = (e.clientY - rect.top) * scaleY;
-
-                    // A. DETAIL VIEW OPEN
-                    if (gameState.rosterDetailMember) {
-                        const w = 600;
-                        const h = 550;
-                        const modalX = (canvas.width - w) / 2;
-                        const modalY = (canvas.height - h) / 2;
-                        const btnY = modalY + h - 80;
-
-                        // 1. CLOSE (Top Right X)
-                        if (x >= modalX + w - 40 && x <= modalX + w && y >= modalY && y <= modalY + 40) {
-                            gameState.rosterDetailMember = null;
-                            return;
-                        }
-
-                        // 2. HEAL (Left Button)
-                        if (gameState.rosterDetailMember.injuries && gameState.rosterDetailMember.injuries.length > 0) {
-                            if (x >= modalX + 40 && x <= modalX + 200 && y >= btnY && y <= btnY + 50) {
-                                if (gameState.economy.gold >= 50) {
-                                    gameState.economy.gold -= 50;
-                                    gameState.rosterDetailMember.injuries = []; // CURED
-                                    gameState.rosterDetailMember.traits = gameState.rosterDetailMember.traits.filter(t => t !== 'Injured');
-                                    alert(`${gameState.rosterDetailMember.name} has been treated!`);
-                                    gameState.persistence.saveAdventurer(gameState.rosterDetailMember, { result: "TREATED", questTitle: "Infirmary" }); // Save state
-                                } else {
-                                    alert("Not enough gold to treat injury (50G).");
-                                }
-                                return;
-                            }
-                        }
-
-                        // 3. FIRE (Right Button)
-                        if (x >= modalX + w - 180 && x <= modalX + w - 40 && y >= btnY && y <= btnY + 50) {
-                            if (confirm(`Are you sure you want to fire ${gameState.rosterDetailMember.name}?`)) {
-                                gameState.persistence.roster.delete(gameState.rosterDetailMember.id);
-                                gameState.rosterDetailMember = null;
-                            }
-                            return;
-                        }
-
-                        return; // Modal consumes clicks
-                    }
-
-                    // B. LIST VIEW
-                    // Check rows. Y starts 180, height 40 per row approx
-                    const members = gameState.persistence ? Array.from(gameState.persistence.roster.values()) : [];
-                    let rowY = 180;
-                    for (let m of members) {
-                        if (y >= rowY - 25 && y <= rowY + 10) { // Approx hit area based on text drawing
-                            gameState.rosterDetailMember = m;
-                            return;
-                        }
-                        rowY += 40;
-                    }
-
-                    // Click outside -> Close Roster
-                    gameState.screen = 'GAME';
+                    // DELEGATED TO Input.js
+                    return;
                 }
                 else if (gameState.screen === 'REPORT') {
                     // Prevent click-through: require 300ms delay after report opens

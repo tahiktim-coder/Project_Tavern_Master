@@ -19,6 +19,16 @@ class PersistenceManager {
         console.log(`Added to Roster: ${data.name} (Total: ${this.roster.size})`);
     }
 
+    removeFromRoster(id) {
+        if (this.roster.has(id)) {
+            const name = this.roster.get(id).name;
+            this.roster.delete(id);
+            console.log(`[Persistence] Fired/Removed: ${name} (ID: ${id})`);
+            return true;
+        }
+        return false;
+    }
+
     _createData(adventurer) {
         return {
             id: adventurer.id,
