@@ -1486,7 +1486,7 @@
 
                 let candidates = [];
                 const race = (hero.race || "").toLowerCase();
-                const cls = (hero.classId || "").toLowerCase();
+                const cls = (hero.visualClass || hero.classId || "").toLowerCase();
 
                 // 1. Try Fuzzy Match (Race + Class)
                 candidates = VALID_ASSETS.filter(f => f.includes(race) && f.includes(cls));

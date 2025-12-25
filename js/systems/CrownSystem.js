@@ -81,7 +81,9 @@ class CrownSystem {
         crown.activeQuest = newQuest;
         crown.nextVisitDay += 7; // Schedule next visit
 
-        events.push({ type: 'ASSIGNMENT', quest: newQuest });
+        if (newQuest) {
+            events.push({ type: 'ASSIGNMENT', quest: newQuest });
+        }
 
         return {
             type: "MESSENGER_VISIT",
@@ -90,19 +92,9 @@ class CrownSystem {
     }
 
     generateQuest(gameState) {
-        // ALWAYS TALENT SCOUT (Expansion)
-        // The Crown demands growth.
-        return {
-            id: `crown_${gameState.day}_talent`,
-            type: 'TALENT_SCOUT',
-            title: "Royal Decree: Expansion",
-            description: "The town is in dire need of permanent protectors. Recruit a new Guild Member and ensure they survive 3 quests.",
-            rank: 'B', // Moderate difficulty
-            target: { requiredWins: 3 },
-            progress: 0,
-            deadlineDay: gameState.day + 7,
-            isCrownQuest: true
-        };
+        // PERMANENTLY DISABLED (User Request: "Get rid of all crown related stuff")
+        // We will rebuild this system ONLY during the Scripted Intro phase.
+        return null;
     }
 }
 

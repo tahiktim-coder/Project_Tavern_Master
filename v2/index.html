@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guild Master V2</title>
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/card.css">
+
+    <!-- Logic Import (RE-USING YOUR EXISTING CODE) -->
+    <!-- We step up one level (..) to access the original js folder -->
+    <script src="../js/data/traitData.js"></script>
+    <script src="../js/data/questData.js"></script>
+
+    <!-- We need a slight wrapper to make ES6 modules work nicely in the browser without a bundler for now -->
+    <script type="module" src="js/App.js"></script>
+</head>
+
+<body>
+
+    <div id="app-container">
+
+        <!-- HEADER (Strategic Layer) -->
+        <header id="game-header">
+            <div class="faction-meter" id="meter-crown">
+                <span class="icon">👑</span>
+                <div class="bar-container">
+                    <div class="bar" style="width: 50%"></div>
+                </div>
+            </div>
+            <div class="faction-meter" id="meter-guild">
+                <span class="icon">💰</span>
+                <span class="value">100 G</span>
+            </div>
+            <div class="faction-meter" id="meter-town">
+                <span class="icon">🏘️</span>
+                <div class="bar-container">
+                    <div class="bar" style="width: 50%"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN STAGE (The Desk) -->
+        <main id="desk-stage">
+            <div id="card-stack">
+                <!-- Cards will be injected here by JS -->
+                <div class="placeholder-card">
+                    <h2>Loading Guild...</h2>
+                </div>
+            </div>
+        </main>
+
+        <!-- FOOTER (Actions) -->
+        <footer id="action-bar">
+            <button id="btn-reject" class="action-btn reject">
+                <span class="icon">✖</span>
+                <span class="label">Dismiss</span>
+            </button>
+            <button id="btn-accept" class="action-btn accept">
+                <span class="icon">✔</span>
+                <span class="label">Recruit</span>
+            </button>
+        </footer>
+
+        <!-- OVERLAY (The Dossier / Inspection) -->
+        <div id="dossier-overlay" class="hidden">
+            <div class="dossier-content">
+                <button id="btn-close-dossier">✕</button>
+                <div id="dossier-body">
+                    <!-- Dynamic Content -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+
+</html>

@@ -4,6 +4,7 @@ export class Adventurer {
         this.name = data.name;
         this.archetype = data.archetype; // "MARTIAL", "ARCANE", etc
         this.classId = data.classId;     // "knight", "rogue"
+        this.visualClass = data.visualClass || data.classId; // Fallback to classId if not mapped
 
         // Stats (The Hidden Variables)
         this.stats = {

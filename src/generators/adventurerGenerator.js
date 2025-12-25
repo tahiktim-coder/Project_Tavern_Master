@@ -25,13 +25,16 @@ export class AdventurerGenerator {
         // 5. Pick Race based on class
         const race = this.pickRaceForClass(charClass.id);
 
-        // 6. Equipment (Placeholder for now, just strings)
+        // 6. Determine Visual Class (Map unsupported classes to supported assets)
+        const visualClass = this.getVisualClass(charClass.id);
+
+        // 7. Equipment (Placeholder for now, just strings)
         const equipment = {
             mainHand: "Basic Weapon",
             armor: "Basic Armor"
         };
 
-        // 7. Name Generation (Simple Placeholder)
+        // 8. Name Generation (Simple Placeholder)
         const names = ["Garrett", "Lyra", "Thorn", "Elara", "Ragnar", "Sylas"];
         const name = names[Math.floor(Math.random() * names.length)] + " the " + charClass.name;
 
@@ -39,11 +42,42 @@ export class AdventurerGenerator {
             name: name,
             archetype: archetypeKey,
             classId: charClass.id,
-            race: race, // NEW: Add race
+            visualClass: visualClass, // Pass mapped visual class
+            race: race,
             stats: stats,
             traits: traits,
             equipment: equipment
         });
+    }
+
+    static getVisualClass(classId) {
+        // Map logical classes to asset filenames (e.g. barbarian -> warrior)
+        const map = {
+            // Martial
+            barbarian: 'warrior',
+            guard: 'warrior',
+            pit_fighter: 'warrior',
+            ronin: 'warrior',
+            mercenary: 'warrior',
+
+            // Arcane
+            battle_mage: 'mage',
+            scholar: 'wizard',
+            elementalist: 'mage',
+            illusionist: 'mage',
+            hedge_wizard: 'wizard',
+
+            // Cunning
+            spy: 'rogue',
+            treasure_hunter: 'rogue',
+            bard: 'rogue', // Fallback
+            assassin: 'assassin', // Supported
+
+            // Divine
+            monk: 'cleric',
+            cultist: 'cleric'
+        };
+        return map[classId] || classId;
     }
 
     static pickRaceForClass(classId) {
