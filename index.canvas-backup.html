@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Guild Master - Mobile</title>
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Existing Logic -->
+    <script src="js/data/traitData.js"></script>
+    <script src="js/data/questData.js"></script>
+    <script src="js/models/Adventurer.js"></script>
+    <script src="js/models/VisualTraits.js"></script>
+    <script src="js/systems/Inspector.js"></script>
+    <script src="js/systems/Persistence.js"></script>
+    <script src="js/systems/Economy.js"></script>
+    <script src="js/systems/Resolution.js"></script>
+    <script src="js/systems/Events.js"></script>
+    <script src="js/systems/Town.js"></script>
+    <script src="js/systems/CrownSystem.js"></script>
+    <script src="src/data/adventurerData.js"></script>
+    <script src="src/generators/adventurerGenerator.js"></script>
+
+    <!-- New Mobile Styles -->
+    <link rel="stylesheet" href="css/mobile.css">
+</head>
+
+<body>
+
+    <div id="mobile-app">
+
+        <!-- HEADER -->
+        <header id="top-bar">
+            <button id="btn-roster" class="header-btn">
+                <span class="btn-icon">📋</span>
+                GUILD ROSTER
+            </button>
+            <div id="crown-status" class="header-icon">
+                <span class="icon">👑</span>
+            </div>
+            <div id="gold-display" class="header-stat">
+                <span class="icon">💰</span>
+                <span id="gold-value">100</span> G
+            </div>
+        </header>
+
+        <!-- MAIN GAME STAGE -->
+        <main id="game-stage">
+
+            <!-- CHARACTER CARD -->
+            <section id="character-card" class="card">
+                <div class="char-portrait">
+                    <img id="char-portrait-img" src="" alt="Character Portrait">
+                    <div class="char-nameplate">
+                        <h2 id="char-name">Loading...</h2>
+                        <p id="char-title">-</p>
+                    </div>
+                </div>
+                <div class="char-info">
+                    <div id="char-traits" class="trait-list">
+                        <!-- Dynamic trait pills -->
+                    </div>
+                    <blockquote id="char-quote" class="char-quote">
+                        "..."
+                    </blockquote>
+                </div>
+            </section>
+
+            <!-- CONTRACTS SECTION -->
+            <section id="contracts-section">
+                <h3 class="section-title">AVAILABLE CONTRACTS</h3>
+                <div id="contracts-grid" class="contracts-grid">
+                    <!-- Dynamic quest cards -->
+                </div>
+            </section>
+
+        </main>
+
+        <!-- FOOTER ACTIONS -->
+        <footer id="action-bar">
+            <button id="btn-end-day" class="btn-primary btn-red">
+                END DAY (DISPATCH)
+            </button>
+            <div class="decision-buttons">
+                <button id="btn-hire" class="btn-large btn-green">
+                    HIRE (<span id="hire-cost">100</span> G)
+                </button>
+                <button id="btn-dismiss" class="btn-large btn-grey">
+                    DISMISS
+                </button>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- OVERLAYS -->
+
+    <!-- CHARACTER DOSSIER -->
+    <div id="overlay-dossier" class="overlay hidden">
+        <div class="overlay-content parchment">
+            <button class="overlay-close">✕</button>
+            <div id="dossier-content">
+                <h2 id="dossier-name" class="dossier-title">Character Name</h2>
+                <p id="dossier-subtitle" class="dossier-subtitle">Level 1 Class (Race)</p>
+
+                <section class="dossier-section">
+                    <h3>📜 ORIGIN</h3>
+                    <blockquote id="dossier-origin"></blockquote>
+                </section>
+
+                <div class="dossier-row">
+                    <section class="dossier-section">
+                        <h3>⚔️ ATTRIBUTES</h3>
+                        <ul id="dossier-attributes" class="attribute-list"></ul>
+                    </section>
+                    <section class="dossier-section">
+                        <h3>🛡️ EQUIPMENT</h3>
+                        <ul id="dossier-equipment" class="equipment-list"></ul>
+                    </section>
+                </div>
+
+                <button id="btn-recruit-from-dossier" class="btn-primary btn-dark">
+                    RECRUIT TO TABLE FIRST
+                </button>
+
+                <section class="dossier-section">
+                    <h3>📖 SERVICE RECORD</h3>
+                    <ul id="dossier-record" class="record-list">
+                        <li class="record-entry">Day 0: Arrived seeking glory.</li>
+                    </ul>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTRACT DETAIL -->
+    <div id="overlay-contract" class="overlay hidden">
+        <div class="overlay-content contract-modal">
+            <button class="overlay-close">✕</button>
+            <div id="contract-content">
+                <h2 id="contract-title" class="contract-title">Quest Name</h2>
+                <p id="contract-flavor" class="contract-flavor">Description here...</p>
+                <div class="contract-stats">
+                    <div>
+                        <strong>Required:</strong> <span id="contract-req">STR</span>
+                    </div>
+                    <div>
+                        <strong>Reward:</strong> <span id="contract-reward">60 G</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW MOBILE CONTROLLER -->
+    <script src="js/mobile-app.js"></script>
+
+</body>
+
+</html>

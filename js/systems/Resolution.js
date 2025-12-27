@@ -200,7 +200,10 @@ class ResolutionManager {
             questTitle: quest.title,
             adventurerName: adventurer.name,
             flavorText,
-            goldEarned // NEW: Include gold in result
+            goldEarned, // Gold earned
+            injuries: adventurer.injuries || [], // Injuries sustained
+            isDead: adventurer.isDead || false, // Death status
+            deathReason: adventurer.deathReason || null // Death description
         };
         console.log("Resolution: Returning:", returnObj);
         return returnObj;

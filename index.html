@@ -3,12 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guild Master</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Guild Master - Mobile</title>
     <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
+
+    <!-- ALL EXISTING SYSTEMS -->
     <script src="js/data/traitData.js"></script>
     <script src="js/data/questData.js"></script>
+    <script src="js/data/visitorData.js"></script>
     <script src="js/models/Adventurer.js"></script>
     <script src="js/models/VisualTraits.js"></script>
     <script src="js/systems/Inspector.js"></script>
@@ -19,397 +21,498 @@
     <script src="js/systems/Resolution.js"></script>
     <script src="js/systems/Events.js"></script>
     <script src="js/systems/Town.js"></script>
-    <script src="js/systems/CrownSystem.js"></script> <!-- NEW: Crown System -->
+    <script src="js/systems/CrownSystem.js"></script>
+    <script src="js/systems/Visitor.js"></script>
     <script src="src/data/adventurerData.js"></script>
     <script src="src/generators/adventurerGenerator.js"></script>
+
+    <link rel="stylesheet" href="css/mobile.css">
+    <link rel="stylesheet" href="css/report-styles.css">
 </head>
 
 <body>
-    <div id="game-container">
-        <canvas id="game-canvas"></canvas>
-        <div id="ui-layer"></div>
-        <div id="debug-console"
-            style="position: absolute; top: 0; left: 0; color: lime; background: rgba(0,0,0,0.8); font-family: monospace; padding: 10px; pointer-events: none; width: 100%; height: 50%; overflow: hidden; display: none;">
+
+    <!-- MOBILE APP CONTAINER -->
+    <div id="mobile-game">
+
+        <!-- START SCREEN -->
+        <div id="screen-start" class="screen">
+            <div class="start-content">
+                <h1 class="game-title">GUILD MASTER</h1>
+                <button id="btn-start" class="btn-large btn-gold">START GAME</button>
+            </div>
         </div>
-    </div>
-    <!-- Debug Console Script -->
-    <script>
-        const debugConsole = document.getElementById('debug-console');
-        debugConsole.style.display = 'block'; // Make visible immediately
-        debugConsole.innerHTML = "<div>Status: Debug Console Loaded...</div>";
 
-        function logToScreen(msg, color = 'white') {
-            debugConsole.innerHTML += `<div style="color: ${color};">${msg}</div>`;
-        }
+        <!-- GAME SCREEN (Main Gameplay) -->
+        <div id="screen-game" class="screen hidden">
+            <!-- Header -->
+            <header id="game-header">
+                <button id="btn-roster-toggle" class="header-btn">📋 ROSTER</button>
+                <button id="btn-crown-status" class="header-btn crown-btn">👑</button>
+                <span id="crown-rep-display" style="color: #aaa; font-size: 0.85em; margin: 0 10px;">Crown:
+                    Neutral</span>
+                <div id="gold-display" class="gold-display">
+                    💰 <span id="gold-value">100</span> G
+                </div>
+            </header>
 
-        // Global Error Handler
-        window.onerror = function (msg, url, line, col, error) {
-            const fileName = url ? url.split('/').pop() : 'unknown';
-            logToScreen(`ERROR: ${msg} <br> File: ${fileName} : Line ${line}`, 'red');
-            return false;
-        };
+            <!-- Main Stage -->
+            <main id="game-main">
+                <!-- Queue Indicator -->
+                <div class="queue-indicator">
+                    Visitor <span id="queue-current">1</span> of <span id="queue-total">1</span>
+                </div>
 
-        // Async Promise Error Handler
-        window.addEventListener('unhandledrejection', function (event) {
-            logToScreen(`ASYNC ERROR: ${event.reason}`, 'orange');
-        });
+                <!-- Character Card -->
+                <div class="char-card">
+                    <div class="char-portrait-wrapper">
+                        <img id="char-portrait" class="char-portrait" src="assets/counter_view.png" alt="Adventurer">
+                    </div>
+                    <div class="char-info-panel">
+                        <h2 id="char-name" class="char-name">Loading...</h2>
+                        <p id="char-subtitle" class="char-subtitle">-</p>
+                        <div id="char-traits" class="char-traits"></div>
+                        <blockquote id="char-quote" class="char-quote">"..."</blockquote>
+                    </div>
+                </div>
 
-        // Console Log Override
-        const originalLog = console.log;
-        console.log = function (...args) {
-            originalLog.apply(console, args);
-            logToScreen(`LOG: ${args.join(' ')}`, '#00FF00');
-        };
+                <!-- Quest Board -->
+                <section id="quest-board-section">
+                    <h3 class="section-header">AVAILABLE CONTRACTS</h3>
+                    <div id="quest-board" class="quest-board"></div>
+                </section>
+            </main>
 
-        logToScreen("Waiting for module to load...", 'yellow');
+            <!-- Footer Actions -->
+            <footer id="game-footer">
+                <button id="btn-end-day" class="btn-action btn-red">END DAY</button>
+                <div class="decision-row">
+                    <button id="btn-hire" class="btn-decision btn-green">HIRE (100 G)</button>
+                    <button id="btn-dismiss" class="btn-decision btn-grey">DISMISS</button>
+                </div>
+            </footer>
+        </div>
 
-        // 1. DATA (Previously adventurerData.js)
-        const ADVENTURER_DATA = {
-            archetypes: {
-                MARTIAL: {
-                    name: "Martial",
-                    classes: [
-                        { id: "knight", name: "Knight-Errant", traits: ["Honorbound", "Arrogant"], stats: { str: [8, 10], int: [2, 5], dex: [4, 6] } },
-                        { id: "barbarian", name: "Barbarian", traits: ["Battle-Rage", "Illiterate"], stats: { str: [9, 10], int: [1, 3], dex: [5, 7] } },
-                        { id: "mercenary", name: "Mercenary", traits: ["Greedy", "Pragmatic"], stats: { str: [6, 8], int: [4, 6], dex: [5, 7] } },
-                        { id: "pit_fighter", name: "Pit Fighter", traits: ["Sadist", "Showman"], stats: { str: [7, 9], int: [2, 4], dex: [7, 9] } },
-                        { id: "guard", name: "Town Guard", traits: ["Lazy", "Corrupt"], stats: { str: [5, 7], int: [3, 5], dex: [4, 6] } },
-                        { id: "ronin", name: "Ronin", traits: ["Wanderer", "Disciplined"], stats: { str: [7, 9], int: [4, 6], dex: [8, 10] } }
-                    ]
+        <!-- REPORT SCREEN (End of Day) -->
+        <div id="screen-report" class="screen hidden">
+            <div class="report-parchment">
+                <h2 id="report-title" class="report-title">Guild Daily Ledger</h2>
+                <p id="report-day" class="report-day">Day 1</p>
+                <div id="report-content" class="report-content"></div>
+                <div id="report-summary" class="report-summary"></div>
+                <button id="btn-next-day" class="btn-large btn-red">NEXT DAY</button>
+            </div>
+        </div>
+
+        <!-- ROSTER SCREEN -->
+        <div id="screen-roster" class="screen hidden">
+            <div class="roster-container">
+                <h2 class="roster-title">Guild Roster</h2>
+                <div id="roster-list" class="roster-list"></div>
+                <button id="btn-close-roster" class="btn-large btn-grey">BACK TO DESK</button>
+            </div>
+        </div>
+
+        <!-- CROWN EVENT SCREEN -->
+        <div id="screen-crown-event" class="screen hidden">
+            <div class="crown-modal">
+                <h2 id="crown-event-title">Royal Messenger</h2>
+                <p id="crown-event-text"></p>
+                <button id="btn-acknowledge-crown" class="btn-large btn-gold">ACKNOWLEDGE</button>
+            </div>
+        </div>
+
+        <!-- CHARACTER INSPECTOR MODAL -->
+        <div id="inspector-modal" class="screen hidden">
+            <div class="crown-modal">
+                <h2 id="inspector-title">Character Details</h2>
+                <pre id="inspector-content"
+                    style="font-family: 'MedievalSharp', monospace; white-space: pre-wrap; text-align: left; line-height: 1.6;"></pre>
+                <button id="btn-close-inspector" class="btn-large btn-grey">CLOSE</button>
+            </div>
+        </div>
+
+        <!-- VISITOR MODAL -->
+        <div id="visitor-modal" class="screen hidden">
+            <div class="crown-modal" style="max-width: 500px;">
+                <h2 id="visitor-title">Visitor</h2>
+                <p id="visitor-dialogue" style="white-space: pre-wrap; line-height: 1.6; margin: 20px 0;"></p>
+                <div id="visitor-choices" class="decision-row" style="flex-direction: column; gap: 10px;"></div>
+            </div>
+        </div>
+
+        <!-- QUEST DETAILS MODAL -->
+        <div id="quest-details-modal" class="screen hidden">
+            <div class="crown-modal" style="max-width: 550px;">
+                <h2 id="quest-detail-title">Quest Name</h2>
+                <p id="quest-detail-desc" style="margin: 15px 0; line-height: 1.6;"></p>
+                <p id="quest-detail-hazard" style="color: #ff6b6b; margin: 10px 0; font-weight: bold;"></p>
+                <p id="quest-detail-meta" style="color: #888; font-size: 0.9em; margin: 10px 0;"></p>
+                <button id="btn-close-quest-details" class="btn-large btn-grey">CLOSE</button>
+            </div>
+        </div>
+
+
+        <!-- GAME LOGIC (Inline - matching Canvas version structure) -->
+        <script>
+            // Game State (matching Canvas version)
+            const gameState = {
+                screen: 'START',
+                day: 0,
+                currentAdventurer: null,
+                quests: [],
+                pendingReports: [],
+                stamp: null,
+                crown: { nextVisitDay: 3, activeQuest: null, history: [] },
+                crownEvent: null,
+                crownStatusOpen: false,
+                dailyEvent: null,
+                lastUpkeep: null,
+                reportOpenedAt: null,
+                rosterOpenedAt: null,
+                // Systems (initialized in init())
+                economy: null,
+                inspector: null,
+                persistence: null,
+                events: null,
+                town: null,
+                crownSystem: null,
+                visitor: null,
+                // Reputation tracking
+                crownReputation: 0,
+                townReputation: 0
+            };
+
+            // DOM Elements Cache
+            const DOM = {
+                screens: {
+                    start: document.getElementById('screen-start'),
+                    game: document.getElementById('screen-game'),
+                    report: document.getElementById('screen-report'),
+                    roster: document.getElementById('screen-roster'),
+                    crownEvent: document.getElementById('screen-crown-event')
                 },
-                ARCANE: {
-                    name: "Arcane",
-                    classes: [
-                        { id: "battle_mage", name: "Battle Mage", traits: ["Pyromaniac", "Short-Tempered"], stats: { str: [4, 6], int: [8, 10], dex: [4, 6] } },
-                        { id: "scholar", name: "Scholar", traits: ["Cowardly", "Curious"], stats: { str: [2, 4], int: [9, 10], dex: [3, 5] } },
-                        { id: "necromancer", name: "Necromancer", traits: ["Outcast", "Creepy"], stats: { str: [3, 5], int: [8, 10], dex: [3, 5] } },
-                        { id: "illusionist", name: "Illusionist", traits: ["Liar", "Kleptomaniac"], stats: { str: [3, 5], int: [7, 9], dex: [8, 10] } },
-                        { id: "elementalist", name: "Elementalist", traits: ["Volatile", "Connected"], stats: { str: [4, 6], int: [7, 9], dex: [5, 7] } },
-                        { id: "hedge_wizard", name: "Hedge Wizard", traits: ["Helpful", "Unlicensed"], stats: { str: [3, 5], int: [5, 7], dex: [4, 6] } }
-                    ]
-                },
-                CUNNING: {
-                    name: "Cunning",
-                    classes: [
-                        { id: "rogue", name: "Rogue", traits: ["Greedy", "Traitor"], stats: { str: [3, 5], int: [5, 7], dex: [8, 10] } },
-                        { id: "ranger", name: "Ranger", traits: ["Loner", "Nature-Lover"], stats: { str: [5, 7], int: [4, 6], dex: [8, 10] } },
-                        { id: "bard", name: "Bard", traits: ["Drunk", "Flirtatious"], stats: { str: [3, 5], int: [6, 8], dex: [7, 9] } },
-                        { id: "assassin", name: "Assassin", traits: ["Cold-Blooded", "Contract_Killer"], stats: { str: [5, 7], int: [6, 8], dex: [9, 10] } },
-                        { id: "treasure_hunter", name: "Treasure Hunter", traits: ["Obsessive", "Unlucky"], stats: { str: [4, 6], int: [5, 8], dex: [7, 9] } },
-                        { id: "spy", name: "Spy", traits: ["Double Agent", "Paranoid"], stats: { str: [4, 6], int: [8, 10], dex: [6, 8] } }
-                    ]
-                },
-                DIVINE: {
-                    name: "Divine",
-                    classes: [
-                        { id: "cleric", name: "Cleric", traits: ["Zealot", "Pacifist"], stats: { str: [5, 7], int: [7, 9], dex: [3, 5] } },
-                        { id: "paladin", name: "Paladin", traits: ["Lawful Stupid", "Judgemental"], stats: { str: [8, 10], int: [4, 6], dex: [4, 6] } },
-                        { id: "druid", name: "Druid", traits: ["Feral", "Territorial"], stats: { str: [5, 7], int: [6, 8], dex: [6, 8] } },
-                        { id: "monk", name: "Monk", traits: ["Vow of Silence", "Disciplined"], stats: { str: [7, 9], int: [6, 8], dex: [9, 10] } },
-                        { id: "cultist", name: "Cultist", traits: ["Insane", "Doomed"], stats: { str: [4, 6], int: [5, 7], dex: [5, 7] } }
-                    ]
+                goldValue: document.getElementById('gold-value'),
+                charPortrait: document.getElementById('char-portrait'),
+                charName: document.getElementById('char-name'),
+                charSubtitle: document.getElementById('char-subtitle'),
+                charTraits: document.getElementById('char-traits'),
+                charQuote: document.getElementById('char-quote'),
+                questBoard: document.getElementById('quest-board'),
+                reportContent: document.getElementById('report-content'),
+                reportSummary: document.getElementById('report-summary'),
+                rosterList: document.getElementById('roster-list')
+            };
+
+            // Drag-and-Drop State
+            let draggedQuest = null;
+
+            // ================================================
+            // RENDERING FUNCTIONS
+            // ================================================
+
+            function setScreen(screenName) {
+                Object.keys(DOM.screens).forEach(key => {
+                    DOM.screens[key].classList.add('hidden');
+                });
+                if (DOM.screens[screenName]) {
+                    DOM.screens[screenName].classList.remove('hidden');
                 }
-            }
-        };
-
-        // 2. MODEL (Imported from js/models/Adventurer.js)
-        // class Adventurer removed to avoid duplicate declaration error
-
-
-        // 3. GENERATOR (Previously adventurerGenerator.js)
-        class AdventurerGenerator {
-            static generate(day = 1) {
-                const archetypeKeys = Object.keys(ADVENTURER_DATA.archetypes);
-                const archetypeKey = archetypeKeys[Math.floor(Math.random() * archetypeKeys.length)];
-                const archetypeData = ADVENTURER_DATA.archetypes[archetypeKey];
-                const charClass = archetypeData.classes[Math.floor(Math.random() * archetypeData.classes.length)];
-
-                const stats = {
-                    str: this.randomRange(charClass.stats.str[0], charClass.stats.str[1]),
-                    int: this.randomRange(charClass.stats.int[0], charClass.stats.int[1]),
-                    dex: this.randomRange(charClass.stats.dex[0], charClass.stats.dex[1]),
-                    vit: this.randomRange(3, 8)
-                };
-
-                const traits = [...charClass.traits];
-
-                // Pick race based on class
-                const race = this.pickRaceForClass(charClass.id);
-
-                const equipment = { mainHand: "Basic Weapon", armor: "Basic Armor" };
-                const names = [
-                    "Garrett", "Lyra", "Thorn", "Elara", "Ragnar", "Sylas", "Kael", "Mira", "Dorn", "Vera",
-                    "Finn", "Isla", "Bram", "Nia", "Oren", "Tess", "Cade", "Luna", "Zane", "Hope",
-                    "Grom", "Thalia", "Voric", "Sera", "Merrick", "Juno", "Torin", "Ivy", "Xander", "Fae"
-                ];
-                const name = names[Math.floor(Math.random() * names.length)] + " the " + charClass.name;
-
-                return new Adventurer({
-                    name: name,
-                    archetype: archetypeKey,
-                    classId: charClass.id,
-                    race: race, // NEW: Add race
-                    stats: stats,
-                    traits: traits,
-                    equipment: equipment
-                });
+                gameState.screen = screenName.toUpperCase();
             }
 
-            static pickRaceForClass(classId) {
-                // Map to maximize portrait usage - group similar classes
-                const raceMap = {
-                    // MARTIAL - Use human_warrior or orc_barbarian
-                    warrior: 'human',  // human_warrior.png
-                    knight: 'human',   // human_warrior.png
-                    pit_fighter: 'human', // human_warrior.png
-                    mercenary: 'human', // human_warrior.png
-                    ronin: 'human',    // human_warrior.png
-                    guard: 'human',    // human_warrior.png  
-                    barbarian: 'orc',  // orc_barbarian.png (always orc now)
-
-                    // ARCANE - Use elf_mage or human_necromancer
-                    battle_mage: 'elf',    // elf_mage.png
-                    scholar: 'elf',        // elf_mage.png
-                    illusionist: 'elf',    // elf_mage.png
-                    elementalist: 'elf',   // elf_mage.png
-                    hedge_wizard: 'elf',   // elf_mage.png
-                    necromancer: 'human',  // human_necromancer.png
-                    cultist: 'human',      // human_necromancer.png
-
-                    // CUNNING - Use human_rogue or elf_ranger
-                    rogue: 'human',        // human_rogue.png
-                    assassin: 'human',     // human_rogue.png
-                    spy: 'human',          // human_rogue.png
-                    treasure_hunter: 'human', // human_rogue.png
-                    bard: 'human',         // human_rogue.png (close enough)
-                    ranger: 'elf',         // elf_ranger.png
-
-                    // DIVINE - Use human_cleric or dwarf_paladin
-                    cleric: 'human',   // human_cleric.png
-                    monk: 'human',     // human_cleric.png (both holy)
-                    druid: 'elf',      // elf_ranger.png (nature themed)
-                    paladin: 'dwarf'   // dwarf_paladin.png
-                };
-
-                return raceMap[classId] || 'human';
+            function updateGoldDisplay() {
+                DOM.goldValue.textContent = gameState.economy ? gameState.economy.gold : 0;
             }
 
-            static randomRange(min, max) {
-                return Math.floor(Math.random() * (max - min + 1)) + min;
-            }
-        }
+            function updateReputationDisplay() {
+                const repDisplay = document.getElementById('crown-rep-display');
+                if (!repDisplay) return;
 
-        // Expose for external systems
-        window.GameSystems = window.GameSystems || {};
-        window.GameSystems.AdventurerGenerator = AdventurerGenerator;
+                const rep = gameState.crownReputation || 0;
+                let label, color;
 
-        // 4. RENDERER (Previously Renderer.js)
-        class Renderer {
-            constructor(canvas) {
-                this.ctx = canvas.getContext('2d');
-                this.width = canvas.width;
-                this.height = canvas.height;
-                this.assets = {};
-                this.portraits = {}; // NEW: Cache for character portraits
-                this.isLoaded = false;
-            }
-
-            loadAssets() {
-                return new Promise((resolve) => {
-                    let loaded = 0;
-                    const checkDone = () => { if (++loaded >= 2) resolve(); };
-
-                    // Start Screen Background (New Optimized Title Screen)
-                    const imgStart = new Image();
-                    imgStart.src = 'assets/title_screen.png';
-                    imgStart.onload = () => { this.assets['bg_start'] = imgStart; checkDone(); };
-                    imgStart.onerror = () => { logToScreen("Start BG Failed", 'orange'); checkDone(); };
-
-                    // Game Screen Background (Papers Please POV Counter View)
-                    const imgGame = new Image();
-                    imgGame.src = 'assets/counter_view.png';
-                    imgGame.onload = () => { this.assets['bg_game'] = imgGame; logToScreen("Game BG Loaded", 'lime'); checkDone(); };
-                    imgGame.onerror = () => { logToScreen("Game BG Failed", 'orange'); checkDone(); };
-                });
-            }
-
-            draw(gameState) {
-                this.ctx.clearRect(0, 0, this.width, this.height);
-
-                // Select Background based on Screen State
-                let bgKey = gameState.screen === 'START' ? 'bg_start' : 'bg_game';
-                if (this.assets[bgKey]) {
-                    this.ctx.drawImage(this.assets[bgKey], 0, 0, this.width, this.height);
+                if (rep >= 5) {
+                    label = "Favored";
+                    color = "#ffd700"; // Gold
+                } else if (rep <= -5) {
+                    label = "Disfavored";
+                    color = "#ff6b6b"; // Red
                 } else {
-                    this.ctx.fillStyle = "#3e3e3e";
-                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    label = "Neutral";
+                    color = "#aaa"; // Gray
                 }
 
-                if (gameState.screen === 'START') {
-                    this.drawStartScreen();
-                } else if (gameState.screen === 'GAME') {
-                    this.drawGameScreen(gameState);
-                    // Overlay
-                    if (gameState.crownStatusOpen) {
-                        this.drawCrownStatus(gameState);
+                repDisplay.textContent = `Crown: ${label} (${rep >= 0 ? '+' : ''}${rep})`;
+                repDisplay.style.color = color;
+            }
+
+            function renderCharacter() {
+                const char = gameState.currentAdventurer;
+
+                // Update queue indicator
+                const queueRemaining = gameState.town ? gameState.town.dailyQueue.length : 0;
+                const queueTotal = queueRemaining + (char ? 1 : 0);
+                const queueCurrent = queueTotal - queueRemaining;
+                document.getElementById('queue-current').textContent = char ? queueCurrent : 0;
+                document.getElementById('queue-total').textContent = queueTotal;
+
+                if (!char) {
+                    // Show Guild Assistant instead of empty desk
+                    DOM.charName.textContent = "Sera";
+                    DOM.charSubtitle.textContent = "Guild Inn-keeper";
+                    DOM.charTraits.innerHTML = '';
+
+                    // Friendly dialogue variations
+                    const seraSayings = [
+                        "All visitors seen for today, Guild Master. Rest well earned!",
+                        "The day's business concludes, Master. Shall I prepare the evening reports?",
+                        "Quiet at the guild tonight. A good sign, perhaps?",
+                        "No more adventurers today, Master. Time to count our coin!",
+                        "The queue is empty, Guild Master. Your efficiency is admirable~",
+                        "That's everyone for today! Shall I fetch you some ale while you tally the books?"
+                    ];
+                    const seraSaying = seraSayings[Math.floor(Math.random() * seraSayings.length)];
+                    DOM.charQuote.textContent = `"${seraSaying}"`;
+
+                    // Use female elf ranger portrait as placeholder for inn-keeper
+                    DOM.charPortrait.src = 'assets/portraits/elf_ranger_female_1.png';
+                    DOM.charPortrait.onerror = () => {
+                        // Fallback to any female portrait
+                        DOM.charPortrait.src = 'assets/portraits/human_cleric_female_1.png';
+                        DOM.charPortrait.onerror = () => {
+                            // Final fallback
+                            DOM.charPortrait.src = 'assets/counter_view.png';
+                        };
+                    };
+
+                    // Remove drop zone listeners
+                    DOM.charPortrait.ondragover = null;
+                    DOM.charPortrait.ondragleave = null;
+                    DOM.charPortrait.ondrop = null;
+                    return;
+                }
+
+                DOM.charName.textContent = char.name;
+                DOM.charSubtitle.textContent = `Level ${char.level || 1} ${char.classId} (${char.race})`;
+
+                // Portrait - Use visualClass (mapped by generator) instead of classId
+                // visualClass maps logical classes (guard, monk, etc.) to asset names (warrior, cleric, etc.)
+                const visualClass = char.visualClass || char.classId; // Fallback if old data
+
+                // Gender detection: check if name suggests female
+                const femaleNames = ['lyra', 'elara', 'sera', 'maya', 'aria', 'zara', 'nova'];
+                const isFemale = femaleNames.some(name => char.name.toLowerCase().includes(name));
+
+                // For humans, portraits follow: race_class_gender_variant.png
+                // For other races: race_class_variant.png
+                const portraitVariant = Math.floor(Math.random() * 3) + 1; // 1-3
+
+                if (char.race === 'human') {
+                    // Human portraits need gender segment
+                    const gender = isFemale ? 'female' : 'male';
+                    const path1 = `assets/portraits/human_${visualClass}_${gender}_${portraitVariant}.png`;
+                    DOM.charPortrait.src = path1;
+
+                    DOM.charPortrait.onerror = () => {
+                        // Try without variant number
+                        DOM.charPortrait.src = `assets/portraits/human_${visualClass}_${gender}_1.png`;
+                        DOM.charPortrait.onerror = () => {
+                            // Try opposite gender as fallback
+                            const altGender = isFemale ? 'male' : 'female';
+                            DOM.charPortrait.src = `assets/portraits/human_${visualClass}_${altGender}_1.png`;
+                            DOM.charPortrait.onerror = () => {
+                                // Final fallback: warrior
+                                DOM.charPortrait.src = `assets/portraits/human_warrior_male_1.png`;
+                            };
+                        };
+                    };
+                } else {
+                    // Non-human races: race_class_variant.png
+                    const basePath = `assets/portraits/${char.race}_${visualClass}`;
+                    DOM.charPortrait.src = `${basePath}_${portraitVariant}.png`;
+
+                    DOM.charPortrait.onerror = () => {
+                        // Try without variant
+                        DOM.charPortrait.src = `${basePath}_1.png`;
+                        DOM.charPortrait.onerror = () => {
+                            // Race-specific fallback
+                            const fallbacks = {
+                                elf: 'assets/portraits/elf_ranger_1.png',
+                                dwarf: 'assets/portraits/dwarf_paladin_1.png',
+                                orc: 'assets/portraits/orc_warrior_1.png'
+                            };
+                            DOM.charPortrait.src = fallbacks[char.race] || 'assets/portraits/human_warrior_male_1.png';
+                        };
+                    };
+                }
+
+                // Traits
+                DOM.charTraits.innerHTML = '';
+                if (char.traits && char.traits.length > 0) {
+                    char.traits.forEach(trait => {
+                        const pill = document.createElement('span');
+                        pill.className = 'trait-pill';
+                        pill.textContent = trait;
+                        DOM.charTraits.appendChild(pill);
+                    });
+                }
+
+                // Quote (simple for now)
+                const quotes = [
+                    "I need work.",
+                    "Point me to the danger.",
+                    "Let's earn some gold.",
+                    "I'm ready for this.",
+                    "Show me the contract."
+                ];
+                DOM.charQuote.textContent = `"${quotes[Math.floor(Math.random() * quotes.length)]}"`;
+
+                // Click to inspect character details - CAPTURE char in closure!
+                const adventurerToInspect = char; // Capture current char
+                DOM.charPortrait.onclick = () => {
+                    if (adventurerToInspect && gameState.inspector) {
+                        gameState.inspector.show(adventurerToInspect);
                     }
-                } else if (gameState.screen === 'REPORT') {
-                    this.drawMorningReportV2(gameState);
-                } else if (gameState.screen === 'ROSTER') {
-                    this.drawRosterScreen(gameState);
-                } else if (gameState.screen === 'CROWN_EVENT') {
-                    this.drawMessenger(gameState.crownEvent);
+                };
+                DOM.charPortrait.style.cursor = 'pointer';
+
+                // Setup Drop Zone for Drag-and-Drop
+                DOM.charPortrait.ondragover = (e) => {
+                    if (draggedQuest && !char.isAssigned) {
+                        e.preventDefault();
+                        DOM.charPortrait.classList.add('drag-over');
+                    }
+                };
+
+                DOM.charPortrait.ondragleave = (e) => {
+                    DOM.charPortrait.classList.remove('drag-over');
+                };
+
+                DOM.charPortrait.ondrop = (e) => {
+                    e.preventDefault();
+                    DOM.charPortrait.classList.remove('drag-over');
+                    if (draggedQuest && char && !char.isAssigned) {
+                        assignQuestToVisitor(draggedQuest.quest, draggedQuest.index);
+                    }
+                };
+
+                // Show assigned quest if any
+                const parent = DOM.charQuote.parentElement;
+                // Clear any existing badges
+                const oldBadge = parent.querySelector('.assigned-badge');
+                if (oldBadge) oldBadge.remove();
+
+                if (char.isAssigned && char.currentQuest !== null && gameState.quests[char.currentQuest]) {
+                    const assignedQuest = gameState.quests[char.currentQuest];
+                    const badge = document.createElement('div');
+                    badge.className = 'assigned-badge';
+                    badge.innerHTML = `📜 Quest: <strong>${assignedQuest.title || assignedQuest.name}</strong>`;
+                    parent.appendChild(badge);
                 }
             }
 
-            drawMorningReportV2(gameState) {
-                // 1. Background (Darkened Tavern)
-                this.ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
-                this.ctx.fillRect(0, 0, this.width, this.height);
+            function renderQuests() {
+                DOM.questBoard.innerHTML = '';
 
-                // 2. The Ledger (Large Scroll)
-                const sheetW = 900;
-                const sheetH = 680;
-                const bx = (this.width - sheetW) / 2;
-                const by = (this.height - sheetH) / 2;
-
-                // Paper Background
-                this.ctx.fillStyle = "#f5e6d3";
-                this.ctx.fillRect(bx, by, sheetW, sheetH);
-
-                // Border
-                this.ctx.strokeStyle = "#4a321e";
-                this.ctx.lineWidth = 10;
-                this.ctx.strokeRect(bx, by, sheetW, sheetH);
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(bx + 15, by + 15, sheetW - 30, sheetH - 30);
-
-                // 3. Header
-                this.ctx.fillStyle = "#3e2723";
-                this.ctx.font = "bold 40px 'MedievalSharp', cursive";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText("Guild Daily Ledger", this.width / 2, by + 60);
-
-                this.ctx.font = "26px 'MedievalSharp', cursive";
-                this.ctx.fillText("Day " + gameState.day, this.width / 2, by + 95);
-
-                // Divider
-                this.ctx.beginPath();
-                this.ctx.moveTo(bx + 100, by + 110);
-                this.ctx.lineTo(bx + sheetW - 100, by + 110);
-                this.ctx.lineWidth = 4;
-                this.ctx.stroke();
-
-                // 3.5. RANDOM EVENT BANNER
-                // Draw this AT THE TOP if we have one
-                let eventOffset = 0;
-                if (gameState.dailyEvent) {
-                    eventOffset = 70; // Push list down
-                    const ev = gameState.dailyEvent;
-
-                    // Banner BG
-                    this.ctx.fillStyle = ev.type === 'GOOD' ? "rgba(46, 125, 50, 0.1)" :
-                        (ev.type === 'BAD' ? "rgba(198, 40, 40, 0.1)" : "rgba(0, 0, 0, 0.05)");
-                    this.ctx.fillRect(bx + 40, by + 120, sheetW - 80, 60);
-                    this.ctx.strokeStyle = ev.type === 'GOOD' ? "#2e7d32" : (ev.type === 'BAD' ? "#c62828" : "#5d4037");
-                    this.ctx.lineWidth = 2;
-                    this.ctx.strokeRect(bx + 40, by + 120, sheetW - 80, 60);
-
-                    // Text
-                    this.ctx.textAlign = "center";
-                    this.ctx.font = "bold 22px 'MedievalSharp', cursive";
-                    this.ctx.fillStyle = ev.type === 'GOOD' ? "#1b5e20" : (ev.type === 'BAD' ? "#b71c1c" : "#3e2723");
-                    this.ctx.fillText(`EVENT: ${ev.title}`, this.width / 2, by + 145);
-
-                    this.ctx.font = "italic 16px monospace";
-                    this.ctx.fillStyle = "#5d4037";
-                    this.ctx.fillText(`${ev.description} ${ev.resolvedResult ? '(' + ev.resolvedResult + ')' : ''}`, this.width / 2, by + 170);
+                if (!gameState.quests || gameState.quests.length === 0) {
+                    DOM.questBoard.innerHTML = '<p class="empty-quest-board">No contracts available</p>';
+                    return;
                 }
 
-                // 4. Entries
-                let cy = by + 140 + eventOffset;
-                const startX = bx + 80;
+                gameState.quests.forEach((quest, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'quest-scroll';
+                    card.dataset.questIndex = index;
 
+                    const title = quest.title || quest.name || 'Unknown Quest';
+                    const reward = quest.rewards?.gold || quest.reward || quest.gold || 50;
+                    const req = quest.primary_stat || quest.difficulty || 'STR';  // Use primary_stat
+
+                    // Check if assigned and add class
+                    if (quest.assignedTo) {
+                        card.classList.add('assigned');
+                    }
+
+                    card.innerHTML = `
+                    <div class="scroll-header">
+                        <span class="scroll-title">${title}</span>
+                        <span class="scroll-reward">${reward} G</span>
+                    </div>
+                    <div class="scroll-req">Req: ${req}</div>
+                `;
+
+                    // Click to view details
+                    card.onclick = () => showQuestDetails(quest);
+                    card.style.cursor = 'pointer';
+
+                    // Make quest scrolls draggable
+                    if (!quest.assignedTo) {
+                        card.draggable = true;
+
+                        card.addEventListener('dragstart', (e) => {
+                            draggedQuest = { index, quest };
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.target.style.opacity = '0.4';
+                        });
+
+                        card.addEventListener('dragend', (e) => {
+                            e.target.style.opacity = '1';
+                            draggedQuest = null;
+                        });
+                    }
+
+                    DOM.questBoard.appendChild(card);
+                });
+            }
+
+            function renderReport() {
+                // Title
+                document.getElementById('report-title').textContent = 'Guild Daily Ledger';
+                document.getElementById('report-day').textContent = `Day ${gameState.day}`;
+
+                // Quest Results - Enhanced with colors, injuries, deaths
+                DOM.reportContent.innerHTML = '';
                 if (gameState.pendingReports && gameState.pendingReports.length > 0) {
-                    const count = gameState.pendingReports.length;
-                    // Dynamic Row Height Logic
-                    // Available height: 410px (Reduced to fit footer). Min 55, Max 85.
-                    // Subtract event offset if one is present
-                    const availableH = 410 - eventOffset;
-                    const rowHeight = Math.max(55, Math.min(85, availableH / count));
+                    gameState.pendingReports.forEach(report => {
+                        const entry = document.createElement('div');
 
-                    gameState.pendingReports.forEach((report, idx) => {
-                        const hero = report.adventurer || {};
+                        // Color-coded by result
+                        let resultClass = 'report-entry';
+                        if (report.result === 'SUCCESS') resultClass += ' report-success';
+                        else if (report.result === 'MIXED') resultClass += ' report-mixed';
+                        else if (report.result === 'FAILURE') resultClass += ' report-failure';
 
-                        // Alternating Background Strip
-                        if (idx % 2 === 0) {
-                            this.ctx.fillStyle = "rgba(139, 69, 19, 0.05)"; // Very faint brown
-                            this.ctx.fillRect(bx + 20, cy - rowHeight / 2 + 10, sheetW - 40, rowHeight);
+                        entry.className = resultClass;
+
+                        // Build report content
+                        let content = `<strong>${report.result}:</strong> ${report.questTitle}<br>`;
+                        content += `<em>${report.adventurerName}</em> - ${report.goldEarned || 0} G`;
+
+                        // Show injuries if any
+                        if (report.injuries && report.injuries.length > 0) {
+                            const injuryNames = report.injuries.map(i => i.name || i).join(', ');
+                            content += `<br><span class="injury-warning">⚠️ Injured: ${injuryNames}</span>`;
                         }
 
-                        // Icons & Colors
-                        let icon = "❓";
-                        let color = "#333";
-                        let statusText = report.result;
-
-                        if (report.result === "SUCCESS") {
-                            icon = "✔"; color = "#2e7d32";
-
-                        } else if (hero.isDead) { // DEATH Check
-                            icon = "💀"; color = "#b71c1c"; statusText = "KILLED";
-                        } else if (hero.injuries && hero.injuries.length > 0) {
-                            icon = "⚠"; color = "#e65100"; statusText = "INJURED";
-                        } else if (report.result === "FAILURE") {
-                            icon = "✖"; color = "#c62828";
-                        } else if (report.result === "MIXED") {
-                            icon = "−"; color = "#f57c00"; statusText = "Mixed";
+                        // Show death
+                        if (report.isDead) {
+                            content += `<br><span class="death-notice">💀 DECEASED</span>`;
                         }
 
-                        // A. Icon
-                        this.ctx.textAlign = "center";
-                        this.ctx.font = `bold ${Math.min(30, rowHeight / 2)}px monospace`;
-                        this.ctx.fillStyle = color;
-                        this.ctx.fillText(icon, startX, cy + 8);
-
-                        // B. Quest & Status
-                        this.ctx.textAlign = "left";
-                        this.ctx.font = "bold 20px 'MedievalSharp', cursive"; // Slightly smaller
-                        this.ctx.fillText(`[${statusText}] ${report.questTitle}`, startX + 50, cy);
-
-                        // C. Hero Name
-                        this.ctx.font = "italic 16px 'MedievalSharp', cursive";
-                        this.ctx.fillStyle = "#5d4037";
-                        this.ctx.fillText(report.adventurerName, startX + 60, cy + 20);
-
-                        // D. Flavor/Consequence
-                        this.ctx.font = "13px 'MedievalSharp', cursive";
-                        this.ctx.fillStyle = "#3e2723";
-                        let flavor = report.flavorText || "";
-                        if (hero.isDead) flavor = "✝ " + flavor;
-                        else if (hero.injuries && hero.injuries.length > 0) {
-                            const inj = hero.injuries[hero.injuries.length - 1];
-                            const dur = inj.duration === -1 ? 'Permanent' : inj.duration + 'd';
-                            flavor = `⚠ ${inj.name} (${dur}) - ${flavor}`;
+                        // Flavor text
+                        if (report.flavorText) {
+                            content += `<br><span class="flavor-text">${report.flavorText}</span>`;
                         }
-                        // Truncate based on width
-                        if (flavor.length > 75) flavor = flavor.substring(0, 72) + "...";
-                        this.ctx.fillText(flavor, startX + 60, cy + 36);
 
-                        // E. Gold
-                        const gold = report.goldEarned || 0;
-                        this.ctx.textAlign = "right";
-                        this.ctx.font = "bold 22px 'MedievalSharp', cursive";
-                        this.ctx.fillStyle = gold > 0 ? "#f9a825" : "#9e9e9e";
-                        this.ctx.fillText(gold > 0 ? `+${gold} G` : "0 G", bx + sheetW - 80, cy + 5);
-
-                        cy += rowHeight;
+                        entry.innerHTML = content;
+                        DOM.reportContent.appendChild(entry);
                     });
                 } else {
-                    this.ctx.fillStyle = "#8d6e63";
-                    this.ctx.fillText("No guild activity recorded.", this.width / 2, cy + 50);
+                    DOM.reportContent.innerHTML = '<p>No guild activity recorded.</p>';
                 }
 
-                // TOTALS Calculation
+                // Summary
                 let totalGold = 0;
                 if (gameState.pendingReports) {
                     gameState.pendingReports.forEach(r => totalGold += (r.goldEarned || 0));
@@ -417,1511 +520,276 @@
                 const upkeep = gameState.lastUpkeep ? gameState.lastUpkeep.paid : 0;
                 const net = totalGold - upkeep;
 
-                // Footer Area
-                const footerY = by + sheetH - 150; // Moved UP significantly to avoid Button overlap
-
-                // Line Separation
-                this.ctx.beginPath();
-                this.ctx.moveTo(bx + 50, footerY);
-                this.ctx.lineTo(bx + sheetW - 50, footerY);
-                this.ctx.strokeStyle = "#4a321e";
-                this.ctx.lineWidth = 2;
-                this.ctx.stroke();
-
-                // Financial Summary
-                this.ctx.textAlign = "right";
-                const valX = bx + sheetW - 100;
-                const labX = valX - 120;
-                let fy = footerY + 30;
-
-                // 1. Gross
-                this.ctx.font = "20px monospace";
-                this.ctx.fillStyle = "#5d4037"; // Brown
-                this.ctx.fillText("Gross Revenue:", labX, fy);
-                this.ctx.fillStyle = "#2e7d32"; // Green
-                this.ctx.fillText(`+${totalGold} G`, valX, fy);
-
-                // 2. Upkeep
-                fy += 25;
-                this.ctx.fillStyle = "#5d4037";
-                this.ctx.fillText("Daily Upkeep:", labX, fy);
-                this.ctx.fillStyle = "#c62828"; // Red
-                this.ctx.fillText(`-${upkeep} G`, valX, fy);
-
-                // 3. Net
-                fy += 35;
-                this.ctx.font = "bold 28px 'MedievalSharp', cursive";
-                this.ctx.fillStyle = "#3e2723";
-                this.ctx.fillText("Net Profit:", labX, fy);
-                this.ctx.fillStyle = net >= 0 ? "#FFD700" : "#d32f2f";
-                this.ctx.fillText(`${net >= 0 ? '+' : ''}${net} G`, valX, fy);
-
-                // BUTTON
-                // Centered button at bottom
-                const btnW = 220;
-                const btnH = 60;
-                const btnX = this.width / 2 - btnW / 2;
-                const btnY = by + sheetH - 40; // Overlaps bottom edge slightly for effect
-
-                // Button Shadow
-                this.ctx.fillStyle = "rgba(0,0,0,0.4)";
-                this.ctx.fillRect(btnX + 5, btnY + 5, btnW, btnH);
-
-                // Button Body
-                this.ctx.fillStyle = "#b71c1c"; // Red wax
-                this.ctx.fillRect(btnX, btnY, btnW, btnH);
-                this.ctx.strokeStyle = "#e53935";
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(btnX, btnY, btnW, btnH);
-
-                this.ctx.fillStyle = "#fff";
-                this.ctx.font = "bold 24px 'MedievalSharp', cursive";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText("NEXT DAY", this.width / 2, btnY + 35);
-
-                this.ctx.font = "16px monospace";
-                this.ctx.fillStyle = "#ffcdd2";
-                this.ctx.fillText("(Press SPACE)", this.width / 2, btnY + 80);
+                DOM.reportSummary.innerHTML = `
+                <div class="summary-line">Gross Revenue: <span class="gold">+${totalGold} G</span></div>
+                <div class="summary-line">Daily Upkeep: <span class="red">-${upkeep} G</span></div>
+                <div class="summary-line summary-net">Net Profit: <span class="${net >= 0 ? 'gold' : 'red'}">${net >= 0 ? '+' : ''}${net} G</span></div>
+            `;
             }
 
-            drawStartScreen() {
-                // Dim background
-                this.ctx.fillStyle = "rgba(0,0,0,0.6)";
-                this.ctx.fillRect(0, 0, this.width, this.height);
+            function renderRoster() {
+                DOM.rosterList.innerHTML = '';
+                const members = gameState.persistence ? Array.from(gameState.persistence.roster.values()) : [];
 
-                // Title
-                this.ctx.fillStyle = "#FFD700";
-                this.ctx.font = "bold 60px monospace";
-                this.ctx.textAlign = "center";
-                this.ctx.shadowColor = "black";
-                this.ctx.shadowBlur = 10;
-                this.ctx.fillText("GUILD MASTER", this.width / 2, this.height / 2 - 50);
-                this.ctx.shadowBlur = 0;
-
-                // Play Button
-                this.ctx.fillStyle = "#8B4513";
-                this.ctx.fillRect(this.width / 2 - 100, this.height / 2 + 50, 200, 60);
-                this.ctx.border = "2px solid #fff";
-
-                this.ctx.fillStyle = "#fff";
-                this.ctx.font = "30px monospace";
-                this.ctx.fillText("PLAY", this.width / 2, this.height / 2 + 90);
-
-                this.ctx.font = "16px monospace";
-                this.ctx.fillStyle = "#ccc";
-                this.ctx.fillText("[Press SPACE or Click]", this.width / 2, this.height / 2 + 150);
-            }
-
-            drawRosterScreen(gameState) {
-                // Background (Dark Overlay)
-                this.ctx.fillStyle = "rgba(20, 10, 5, 0.95)";
-                this.ctx.fillRect(0, 0, this.width, this.height);
-
-                // Border
-                this.ctx.strokeStyle = "#FFD700";
-                this.ctx.lineWidth = 4;
-                this.ctx.strokeRect(50, 50, this.width - 100, this.height - 100);
-
-                // Header
-                this.ctx.fillStyle = "#FFD700";
-                this.ctx.font = "bold 50px 'MedievalSharp', cursive";
-                this.ctx.textAlign = "center";
-                this.ctx.shadowColor = "black";
-                this.ctx.shadowBlur = 10;
-                this.ctx.fillText("Guild Roster", this.width / 2, 110);
-                this.ctx.shadowBlur = 0;
-
-                // Scrollable List area (simplified for now as just a list)
-                this.ctx.font = "24px 'MedievalSharp', cursive";
-                this.ctx.textAlign = "left";
-
-                // Get Roster
-                const members = gameState.persistence ? gameState.persistence.roster : [];
-
-                if (!members || members.length === 0) {
-                    this.ctx.fillStyle = "#8d6e63";
-                    this.ctx.textAlign = "center";
-                    this.ctx.fillText("The guild has no members yet.", this.width / 2, this.height / 2);
-                } else {
-                    let y = 180;
-                    const xName = 150;
-                    const xClass = 450;
-                    const xStatus = 750;
-
-                    // Table Headers
-                    this.ctx.fillStyle = "#FFB74D";
-                    this.ctx.fillText("Name", xName, 150);
-                    this.ctx.fillText("Class (Lvl)", xClass, 150);
-                    this.ctx.fillText("Status", xStatus, 150);
-
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(100, 160);
-                    this.ctx.lineTo(this.width - 100, 160);
-                    this.ctx.strokeStyle = "#5d4037";
-                    this.ctx.lineWidth = 2;
-                    this.ctx.stroke();
-
-                    // Entries
-                    members.forEach((m, idx) => {
-                        if (y > this.height - 100) return; // Clip
-
-                        // Alternate rows
-                        if (idx % 2 === 0) {
-                            this.ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-                            this.ctx.fillRect(60, y - 25, this.width - 120, 35);
-                        }
-
-                        this.ctx.fillStyle = "#e0e0e0";
-                        let dispName = m.name;
-                        if (m.isCrownRecruit) dispName = "♔ " + dispName;
-                        if (m.isCrownRecruit) this.ctx.fillStyle = "gold";
-
-                        this.ctx.fillText(dispName, xName, y);
-
-                        this.ctx.fillStyle = "#e0e0e0"; // Reset for class
-                        const cls = m.classId ? m.classId.charAt(0).toUpperCase() + m.classId.slice(1) : "Unknown";
-                        this.ctx.fillText(`Lvl ${m.level || 1} ${cls}`, xClass, y);
-
-                        // Status Color
-                        let status = "Ready";
-                        let color = "#4caf50"; // Green
-
-                        if (m.isDead) { status = "Deceased"; color = "#b71c1c"; }
-                        else if (m.injuries && m.injuries.length > 0) {
-                            const inj = m.injuries[0]; // Get first injury
-                            const dur = (inj && inj.duration !== undefined) ? inj.duration + "d" : "?";
-                            status = "Injured (" + dur + ")";
-                            color = "#ff9800"; // Orange
-                        } else if (m.isAssigned) {
-                            status = "On Quest";
-                            color = "#2196f3"; // Blue
-                        }
-
-                        this.ctx.fillStyle = color;
-                        this.ctx.fillText(status, xStatus, y);
-                        y += 40;
-                    });
+                if (members.length === 0) {
+                    DOM.rosterList.innerHTML = '<p class="empty-roster">No guild members yet.</p>';
+                    return;
                 }
 
-                // Footer
-                if (!gameState.rosterDetailMember) {
-                    this.ctx.fillStyle = "#888";
-                    this.ctx.font = "16px monospace";
-                    this.ctx.textAlign = "center";
-                    this.ctx.fillText("[Click a member to manage]", this.width / 2, this.height - 20);
-                }
+                members.forEach(member => {
+                    const card = document.createElement('div');
+                    card.className = 'roster-card';
 
-                // Draw Detail Modal if active
-                if (gameState.rosterDetailMember) {
-                    this.drawRosterDetail(gameState.rosterDetailMember);
-                }
-            }
-
-            drawRosterDetail(member) {
-                // Dim background
-                this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-                this.ctx.fillRect(0, 0, this.width, this.height);
-
-                // Modal Window
-                const w = 600;
-                const h = 550;
-                const x = (this.width - w) / 2;
-                const y = (this.height - h) / 2;
-
-                this.ctx.fillStyle = "#2c1e14"; // dary wood
-                this.ctx.fillRect(x, y, w, h);
-                this.ctx.strokeStyle = "#FFD700";
-                this.ctx.lineWidth = 4;
-                this.ctx.strokeRect(x, y, w, h);
-
-                // Header
-                this.ctx.fillStyle = "#FFD700";
-                this.ctx.font = "bold 36px 'MedievalSharp', cursive";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText(member.name, x + w / 2, y + 50);
-
-                // Portrait (Left)
-                const pSize = 180;
-                const px = x + 40;
-                const py = y + 80;
-                // Draw frame
-                this.ctx.strokeStyle = "#6d4c41";
-                this.ctx.strokeRect(px, py, pSize, pSize);
-                // Draw Image
-                const portrait = this.getPortrait(member);
-                if (portrait) {
-                    this.ctx.drawImage(portrait, px, py, pSize, pSize);
-                }
-
-                // XP BAR & LEVEL (NEW)
-                const xpY = py + pSize + 15;
-                const xpW = pSize;
-                const xpH = 12;
-                const curXp = member.xp || 0;
-                const reqXp = member.xpToNextLevel || 100;
-                const lvl = member.level || 1;
-                const pct = Math.min(1, curXp / reqXp);
-
-                // Bar BG
-                this.ctx.fillStyle = "#3e2723";
-                this.ctx.fillRect(px, xpY, xpW, xpH);
-                // Bar Fill
-                this.ctx.fillStyle = "#76ff03"; // Green
-                this.ctx.fillRect(px, xpY, xpW * pct, xpH);
-                // Text
-                this.ctx.fillStyle = "#ffd54f"; // Gold text
-                this.ctx.font = "bold 14px monospace";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText(`Lvl ${lvl} (${curXp}/${reqXp} XP)`, px + xpW / 2, xpY + 30);
-
-                // Stats (Right)
-                this.ctx.textAlign = "left";
-                this.ctx.font = "24px monospace";
-                this.ctx.fillStyle = "#fff";
-                let sy = y + 100;
-                const sx = x + 250;
-
-                this.ctx.fillText(`Class: ${member.classId}`, sx, sy); sy += 35;
-                this.ctx.fillText(`Race:  ${member.race}`, sx, sy); sy += 35;
-                sy += 10;
-                this.ctx.fillStyle = "#e0e0e0";
-                this.ctx.fillText(`STR: ${member.stats.str}`, sx, sy); sy += 30;
-                this.ctx.fillText(`DEX: ${member.stats.dex}`, sx, sy); sy += 30;
-                this.ctx.fillText(`INT: ${member.stats.int}`, sx, sy); sy += 30;
-                this.ctx.fillText(`VIT: ${member.stats.vit}`, sx, sy); sy += 30;
-
-                // Injuries / Traits
-                // VISUALS (Inspection Data)
-                sy = y + 290;
-
-                this.ctx.fillStyle = "#81d4fa"; // Light Blue (Scanner color)
-                this.ctx.font = "bold 16px monospace";
-
-                if (member.visuals && member.visuals.length > 0) {
-                    member.visuals.forEach(tag => {
-                        const text = (window.GameData.VisualTraits && window.GameData.VisualTraits[tag]) ? window.GameData.VisualTraits[tag] : tag;
-                        this.ctx.fillText("> " + text, x + 40, sy);
-                        sy += 25;
-                    });
-                } else {
-                    this.ctx.fillText("> Standard appearance.", x + 40, sy);
-                    sy += 25;
-                }
-
-                // Traits
-                sy += 10;
-                this.ctx.fillStyle = "#FFB74D";
-                this.ctx.font = "bold 20px 'MedievalSharp', cursive";
-                this.ctx.fillText("Traits: " + member.traits.join(", "), x + 40, sy);
-
-                sy += 30;
-                if (member.isDead) { // DECEASED DISPLAY
-                    this.ctx.fillStyle = "#b71c1c";
-                    this.ctx.fillText("Condition: DECEASED", x + 40, sy);
-                    this.ctx.font = "italic 16px monospace";
-                    sy += 25;
-
-                    if (member.deathDay) {
-                        this.ctx.fillText(`Died on Day ${member.deathDay}`, x + 40, sy);
-                        sy += 20;
-                    }
-                    if (member.deathReason) {
-                        this.ctx.font = "italic 14px monospace";
-                        // Simple wrap for reason
-                        const words = member.deathReason.split(' ');
-                        let line = "";
-                        words.forEach(word => {
-                            if (this.ctx.measureText(line + word).width > 220) {
-                                this.ctx.fillText(line, x + 40, sy);
-                                line = word + " ";
-                                sy += 18;
-                            } else {
-                                line += word + " ";
-                            }
-                        });
-                        this.ctx.fillText(line, x + 40, sy);
-                        sy += 10;
+                    let status = 'Ready';
+                    let statusClass = 'status-ready';
+                    if (member.isDead) {
+                        status = 'Deceased';
+                        statusClass = 'status-dead';
+                    } else if (member.injuries && member.injuries.length > 0) {
+                        status = 'Injured';
+                        statusClass = 'status-injured';
+                    } else if (member.isAssigned) {
+                        status = 'On Quest';
+                        statusClass = 'status-assigned';
                     }
 
-                    this.ctx.fillStyle = "#888";
-                    this.ctx.fillText("(Cannot go on quests)", x + 40, sy + 20);
-                } else if (member.injuries && member.injuries.length > 0) {
-                    this.ctx.fillStyle = "#ff5252";
-                    const inj = member.injuries[0];
-                    const durText = inj.duration < 0 ? "PERMANENT" : `-${inj.duration}d`;
-                    this.ctx.fillText(`INJURY: ${inj.name} (${durText})`, x + 40, sy);
-                } else {
-                    this.ctx.fillStyle = "#66bb6a";
-                    this.ctx.fillText("Condition: Healthy", x + 40, sy);
-                }
-
-                // ACTIONS
-                const btnY = y + h - 80;
-
-                // HEAL BUTTON (Only if injured)
-                if (member.injuries && member.injuries.length > 0) {
-                    const healPrice = 50;
-                    this.ctx.fillStyle = "#2e7d32";
-                    this.ctx.fillRect(x + 40, btnY, 160, 50);
-                    this.ctx.fillStyle = "#fff";
-                    this.ctx.textAlign = "center";
-                    this.ctx.font = "bold 18px monospace";
-                    this.ctx.fillText(`TREAT (-${healPrice}G)`, x + 120, btnY + 30);
-                    // Hitbox: x+40, btnY, 160, 50
-                }
-
-                // FIRE BUTTON
-                this.ctx.fillStyle = "#c62828";
-                this.ctx.fillRect(x + w - 180, btnY, 140, 50);
-                this.ctx.fillStyle = "#fff";
-                this.ctx.textAlign = "center";
-                this.ctx.font = "bold 18px monospace";
-                this.ctx.fillText("FIRE", x + w - 110, btnY + 30);
-
-                // CLOSE BUTTON (Top Right)
-                this.ctx.fillStyle = "#b71c1c";
-                this.ctx.fillRect(x + w - 40, y, 40, 40);
-                this.ctx.fillStyle = "#fff";
-                this.ctx.fillText("X", x + w - 20, y + 28);
-            }
-
-            drawGameScreen(gameState) {
-                // Draw Quests on Board
-                if (gameState.quests) {
-                    this.drawQuestBoard(gameState.quests);
-                }
-
-                // Draw Adventurer or Empty State
-                const hero = gameState.currentAdventurer;
-                if (hero) {
-                    this.drawAdventurerPlaceholder(hero);
-                } else {
-                    // Draw Empty State
-                    this.ctx.fillStyle = "rgba(0,0,0,0.5)";
-                    this.ctx.font = "italic 30px 'MedievalSharp', cursive";
-                    this.ctx.textAlign = "center";
-                    this.ctx.fillText("The Hall is Empty.", this.width / 2, this.height / 2);
-                    this.ctx.font = "italic 20px 'MedievalSharp', cursive";
-                    this.ctx.fillText("(End the Day to see new visitors)", this.width / 2, this.height / 2 + 40);
-                }
-
-                // UI: Gold & Day - WITH PROPER BACKGROUNDS
-                // Dark panel background for contrast
-                this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-                this.ctx.fillRect(10, 10, 180, 100); // Taller (was 75)
-
-                // Gold border accent
-                this.ctx.strokeStyle = "#FFD700";
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(10, 10, 180, 100);
-
-                // Gold text
-                this.ctx.fillStyle = "#FFD700";
-                this.ctx.font = "bold 22px monospace";
-                this.ctx.textAlign = "left";
-                this.ctx.fillText(`Gold: ${gameState.economy.gold} `, 20, 38);
-
-                // Day text
-                this.ctx.fillStyle = "#FFFFFF";
-                this.ctx.fillText(`Day: ${gameState.day} `, 20, 68);
-
-                // Queue text
-                const queueCount = gameState.town ? gameState.town.dailyQueue.length : 0;
-                this.ctx.fillStyle = "#B0BEC5"; // Blue-grey
-                this.ctx.font = "bold 16px monospace";
-                this.ctx.fillText(`Queue: ${queueCount} `, 20, 88);
-
-                // UI: Guild Roster Button
-                const rosterBtnX = 10;
-                const rosterBtnY = 115; // Moved down (was 95)
-                const rosterBtnW = 180;
-                const rosterBtnH = 50;
-
-                this.ctx.fillStyle = "#4a321e"; // Wood
-                this.ctx.fillRect(rosterBtnX, rosterBtnY, rosterBtnW, rosterBtnH);
-                this.ctx.strokeStyle = "#8d6e63"; // Lighter wood border
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(rosterBtnX, rosterBtnY, rosterBtnW, rosterBtnH);
-
-                this.ctx.fillStyle = "#f5f5f5";
-                this.ctx.font = "bold 18px 'MedievalSharp', cursive";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText("GUILD ROSTER", rosterBtnX + rosterBtnW / 2, rosterBtnY + 32);
-
-                // UI: End Day (Hanging Sign Top Right)
-                // Draw Rope
-                this.ctx.strokeStyle = "#5d4037";
-                this.ctx.lineWidth = 4;
-                this.ctx.beginPath();
-                this.ctx.moveTo(925, 0);
-                this.ctx.lineTo(925, 30);
-                this.ctx.stroke();
-
-                // Draw Sign Board
-                this.ctx.fillStyle = "#4a321e"; // Wood
-                this.ctx.fillRect(860, 30, 130, 50);
-                this.ctx.fillStyle = "#3e2723"; // Border
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(860, 30, 130, 50);
-
-                this.ctx.fillStyle = "#d7ccc8"; // Text
-                this.ctx.font = "bold 18px 'MedievalSharp', cursive";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText("END DAY", 925, 62);
-
-                // UI: Reputation Meter (Left Side)
-                // Draw Wax Seal or Crown Icon
-                const repY = 220; // Moved down from 150 to avoid Roster Button overlap
-                const repX = 40;
-
-                // Icon Background
-                this.ctx.fillStyle = "#3e2723";
-                this.ctx.beginPath();
-                this.ctx.arc(repX, repY, 30, 0, Math.PI * 2);
-                this.ctx.fill();
-
-                // Crown Symbol (Simplified)
-                this.ctx.fillStyle = "gold";
-                this.ctx.font = "24px monospace";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText("♔", repX, repY + 8);
-
-                // Value
-                this.ctx.fillStyle = "#fff";
-                this.ctx.font = "bold 14px monospace";
-                this.ctx.fillText(gameState.reputation || 50, repX, repY + 45);
-
-                // Label
-                this.ctx.fillStyle = "#3e2723";
-                this.ctx.font = "10px monospace";
-                this.ctx.fillText("REP", repX, repY + 55);
-
-
-                // UI: Action Buttons (Bottom Center Area)
-                // Only if Hero exists
-                if (hero) {
-                    // MOVED UP for better visibility
-
-                    // 1. RECRUIT BUTTON (Left)
-                    const recruitX = 302;
-                    const recruitY = 560; // Moved up from 620
-                    const recruitW = 200;
-                    const recruitH = 60;
-
-                    // Draw Recruit Button
-                    this.ctx.fillStyle = "#2e7d32"; // Green
-                    this.ctx.fillRect(recruitX, recruitY, recruitW, recruitH);
-
-                    // Bevel
-                    this.ctx.fillStyle = "#4caf50";
-                    this.ctx.fillRect(recruitX, recruitY, recruitW, 4);
-                    this.ctx.fillStyle = "#1b5e20";
-                    this.ctx.fillRect(recruitX, recruitY + recruitH - 4, recruitW, 4);
-
-                    this.ctx.fillStyle = "#fff";
-                    this.ctx.textAlign = "center";
-                    this.ctx.font = "bold 20px 'MedievalSharp', cursive";
-                    // Show "HIRED" if already in guild
-                    const recruitText = (hero && hero.isGuildMember) ? "HIRED" : "HIRE (100 G)";
-                    this.ctx.fillText(recruitText, recruitX + recruitW / 2, recruitY + 38);
-
-                    // 2. DISMISS BUTTON (Right)
-                    const dismissX = 522;
-                    const dismissY = 560; // Moved up from 620
-                    const dismissW = 200;
-                    const dismissH = 60;
-
-                    // Check if we can dismiss (Must have quests?)
-                    const canDismiss = gameState.quests && gameState.quests.length > 0;
-
-                    if (canDismiss) {
-                        this.ctx.fillStyle = "#546e7a"; // Stone Blue
-                    } else {
-                        this.ctx.fillStyle = "#37474f"; // Dark/Disabled
-                    }
-                    this.ctx.fillRect(dismissX, dismissY, dismissW, dismissH);
-
-                    if (canDismiss) {
-                        this.ctx.fillStyle = "#78909c";
-                        this.ctx.fillRect(dismissX, dismissY, dismissW, 4);
-                        this.ctx.fillStyle = "#37474f";
-                        this.ctx.fillRect(dismissX, dismissY + dismissH - 4, dismissW, 4);
-                        this.ctx.fillStyle = "#eceff1";
-                    } else {
-                        this.ctx.fillStyle = "#546e7a"; // Dim Text
-                    }
-
-                    this.ctx.font = "bold 22px 'MedievalSharp', cursive";
-                    this.ctx.fillText("DISMISS", dismissX + dismissW / 2, dismissY + 38);
-                }
-
-
-
-
-                // Draw Dragged Item (Floating on top)
-                if (gameState.dragState) {
-                    this.drawDraggedQuest(gameState.dragState);
-                }
-
-                // CROWN EVENT OVERLAY
-                if (gameState.screen === 'CROWN_EVENT' && gameState.crownEvent) {
-                    this.drawMessenger(gameState.crownEvent);
-                    return; // Stop drawing other overlays? Or draw on top.
-                }
-
-                // Draw Report Overlay
-
-                // Draw Report Overlay
-                if (gameState.report) {
-                    this.drawReportCard(gameState.report);
-                }
-
-                // Draw Inspection Overlay (if active)
-                if (gameState.inspectionData) {
-                    this.drawInspectionWindow(gameState.inspectionData);
-                }
-
-                // Draw STAMP Animation
-                if (gameState.stamp) {
-                    this.drawStamp(gameState.stamp);
-                }
-
-                // DEBUG OVERLAYS (User Request)
-                // DEBUG OVERLAYS (Removed - See debug_ui_reference.md)
-                // this.drawDebugOverlays(gameState);
-            }
-
-            drawMessenger(crownEvent) {
-                // Safety
-                if (!crownEvent) return;
-
-                const cx = this.width / 2;
-                const cy = this.height / 2;
-                const w = 600;
-                const h = 450;
-
-                // 1. Overlay (Dim Background)
-                this.ctx.fillStyle = "rgba(0,0,0,0.85)";
-                this.ctx.fillRect(0, 0, this.width, this.height);
-
-                // 2. Parchment
-                this.ctx.fillStyle = "#f3e5ab";
-                this.ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
-                this.ctx.strokeStyle = "#8b4513";
-                this.ctx.lineWidth = 8;
-                this.ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
-
-                // 3. Crown Icon
-                this.ctx.fillStyle = "gold";
-                this.ctx.beginPath();
-                this.ctx.arc(cx, cy - h / 2 + 50, 30, 0, Math.PI * 2);
-                this.ctx.fill();
-                this.ctx.strokeStyle = "#b8860b"; // Dark Gold
-                this.ctx.lineWidth = 2;
-                this.ctx.stroke();
-
-                // 4. Title
-                this.ctx.fillStyle = "#3e2723";
-                this.ctx.textAlign = "center";
-                this.ctx.font = "bold 32px 'MedievalSharp'";
-                this.ctx.fillText("Messenger of the Crown", cx, cy - h / 2 + 100);
-
-                // 5. Content
-                this.ctx.font = "20px 'MedievalSharp'";
-                let y = cy - h / 2 + 140;
-
-                if (crownEvent.type === 'MESSENGER_VISIT') {
-                    if (crownEvent.events) {
-                        crownEvent.events.forEach(ev => {
-                            if (ev.type === 'EVALUATION') {
-                                this.ctx.fillStyle = ev.result === 'SUCCESS' ? "green" : "red";
-                                this.ctx.fillText(ev.msg || "Evaluation Complete", cx, y);
-                                y += 40;
-                            } else if (ev.type === 'ASSIGNMENT') {
-                                this.ctx.fillStyle = "#3e2723";
-                                this.ctx.font = "bold 24px 'MedievalSharp'";
-                                this.ctx.fillText("ROYAL DECREE:", cx, y);
-                                y += 35;
-
-                                if (ev.quest) {
-                                    this.ctx.font = "italic 22px 'MedievalSharp'";
-                                    this.ctx.fillText(ev.quest.title || "Unknown Task", cx, y);
-                                    y += 30;
-
-                                    this.ctx.font = "18px monospace";
-                                    const desc = ev.quest.description || "No description.";
-                                    const words = desc.split(' ');
-                                    let line = '';
-                                    words.forEach(word => {
-                                        if (this.ctx.measureText(line + word).width > 500) {
-                                            this.ctx.fillText(line, cx, y);
-                                            y += 20;
-                                            line = word + ' ';
-                                        } else {
-                                            line += word + ' ';
-                                        }
-                                    });
-                                    this.ctx.fillText(line, cx, y);
-                                    y += 40;
-                                }
-                            }
-                        });
-                    }
-                } else {
-                    this.ctx.fillStyle = "red";
-                    this.ctx.fillText(crownEvent.reason || "Event Error", cx, y);
-                }
-
-                // 6. Button
-                const btnY = cy + 140; // Fixed Base
-                this.ctx.fillStyle = "#5d4037";
-                this.ctx.fillRect(cx - 100, btnY, 200, 50);
-                this.ctx.strokeStyle = "gold";
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(cx - 100, btnY, 200, 50);
-
-                this.ctx.fillStyle = "#fff";
-                this.ctx.font = "bold 20px 'MedievalSharp'";
-                this.ctx.fillText("I UNDERSTAND", cx, btnY + 32);
-            }
-
-            drawStamp(stamp) {
-                // Animate value
-                if (stamp.val < 1) stamp.val += 0.08;
-                const scale = 2.5 - Math.min(1.0, stamp.val) * 1.5; // 2.5 -> 1.0 big slam
-                const alpha = Math.min(1, stamp.val * 3);
-
-                this.ctx.save();
-                this.ctx.translate(this.width / 2, this.height / 2);
-                this.ctx.scale(scale, scale);
-                this.ctx.rotate((Math.random() - 0.5) * 0.2); // Organic rotation
-
-                this.ctx.globalAlpha = alpha;
-
-                // 1. WAX BLOB (Organic Shape)
-                let color = "#2f2f2f";
-                if (stamp.type === 'ASSIGNED') color = "#8b0000"; // Red
-                else if (stamp.type === 'HIRED') color = "#2e7d32"; // Green
-
-                this.ctx.fillStyle = color;
-
-                this.ctx.beginPath();
-                // Draw a wobbly circle
-                for (let i = 0; i <= Math.PI * 2; i += 0.2) {
-                    let r = 100 + Math.random() * 10 - 5;
-                    this.ctx.lineTo(Math.cos(i) * r, Math.sin(i) * r);
-                }
-                this.ctx.closePath();
-                this.ctx.fill();
-
-                // Inner rim hint
-                this.ctx.strokeStyle = "rgba(0,0,0,0.2)";
-                this.ctx.lineWidth = 4;
-                this.ctx.stroke();
-
-                // 2. EMBOSSED SIGIL (Sword/Shield or X)
-                this.ctx.fillStyle = "rgba(0,0,0,0.3)"; // Embossed shadow look
-
-                if (stamp.type === 'ASSIGNED') {
-                    // Draw Shield Crest
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(-40, -50);
-                    this.ctx.lineTo(40, -50);
-                    this.ctx.lineTo(40, 10);
-                    this.ctx.quadraticCurveTo(0, 60, -40, 10);
-                    this.ctx.closePath();
-                    this.ctx.fill();
-
-                    // Sword line
-                    this.ctx.fillStyle = "rgba(0,0,0,0.4)";
-                    this.ctx.fillRect(-5, -70, 10, 120);
-                    this.ctx.fillRect(-20, -40, 40, 10); // Hilt
-                    this.ctx.fillRect(-5, -70, 10, 120);
-                    this.ctx.fillRect(-20, -40, 40, 10); // Hilt
-                } else if (stamp.type === 'HIRED') {
-                    // Draw Checkmark / H
-                    this.ctx.fillStyle = "rgba(0,0,0,0.3)";
-                    this.ctx.font = "bold 80px 'MedievalSharp', cursive";
-                    this.ctx.textAlign = "center";
-                    this.ctx.fillText("HIRED", 0, 25);
-                } else {
-                    // Draw "X" or "Dismiss Hand"
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(-50, -50);
-                    this.ctx.lineTo(50, 50);
-                    this.ctx.stroke();
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(50, -50);
-                    this.ctx.lineTo(-50, 50);
-                    this.ctx.stroke();
-                }
-
-                // 3. TEXT on the Rim (Small, Medieval)
-                // this.ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-                // this.ctx.font = "bold 16px MedievalSharp";
-                // this.ctx.textAlign = "center";
-                // this.ctx.fillText(stamp.type, 0, 80); 
-
-                this.ctx.restore();
-            }
-
-            drawCrownStatus(gameState) {
-                // Dim Background
-                this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-                this.ctx.fillRect(0, 0, this.width, this.height);
-
-                // Modal
-                const w = 500;
-                const h = 400;
-                const cx = this.width / 2;
-                const cy = this.height / 2;
-
-                this.ctx.fillStyle = "#3e2723";
-                this.ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
-                this.ctx.strokeStyle = "gold";
-                this.ctx.lineWidth = 4;
-                this.ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
-
-                // Header
-                this.ctx.fillStyle = "gold";
-                this.ctx.font = "bold 28px 'MedievalSharp'";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText("Royal Standing", cx, cy - h / 2 + 50);
-
-                // Reputation
-                this.ctx.fillStyle = "#fff";
-                this.ctx.font = "24px monospace";
-                this.ctx.fillText(`Reputation: ${gameState.reputation || 50}/100`, cx, cy - h / 2 + 90);
-
-                // Active Quest
-                this.ctx.fillStyle = "#f3e5ab"; // Parchment color used for text box
-                this.ctx.fillRect(cx - w / 2 + 20, cy - h / 2 + 120, w - 40, h - 200);
-
-                this.ctx.fillStyle = "#000";
-                this.ctx.textAlign = "center";
-
-                if (gameState.crown && gameState.crown.activeQuest) {
-                    const q = gameState.crown.activeQuest;
-                    this.ctx.font = "bold 22px 'MedievalSharp'";
-                    this.ctx.fillText(q.title || "Unknown Quest", cx, cy - h / 2 + 160);
-
-                    this.ctx.font = "16px monospace";
-                    this.ctx.fillText(`Rank: ${q.rank} | Type: ${q.type}`, cx, cy - h / 2 + 190);
-
-                    // Progress
-                    let progressText = "In Progress";
-                    if (q.type === 'TALENT_SCOUT') {
-                        const targetNum = (q.target && q.target.requiredWins) ? q.target.requiredWins : 3;
-                        let currentProgress = q.progress || 0;
-
-                        // Dynamic Lookup (More Robust)
-                        if (q.targetRecruitId && gameState.persistence) {
-                            const heroData = gameState.persistence.roster.get(q.targetRecruitId);
-                            if (heroData && heroData.questHistory) {
-                                currentProgress = heroData.questHistory.total || 0;
-                            }
-                        }
-
-                        progressText = `Progress: ${currentProgress} / ${targetNum} Quests`;
-                        if (q.targetRecruitName) {
-                            progressText += ` (Hero: ${q.targetRecruitName})`;
-                        }
-                    } else if (q.type === 'MANDATE') {
-                        const isDone = q.status === 'COMPLETED';
-                        progressText = `Progress: ${isDone ? 1 : 0} / 1`;
-                        if (isDone) {
-                            progressText += " (COMPLETED)";
-                        } else {
-                            progressText += " (Objective: Complete Quest)";
-                        }
-                    }
-
-                    this.ctx.font = "bold 20px monospace";
-                    this.ctx.fillStyle = "#2e7d32";
-                    this.ctx.fillText(progressText, cx, cy - h / 2 + 230);
-
-                    // Expiry
-                    if (gameState.crown.nextVisitDay) {
-                        const daysLeft = gameState.crown.nextVisitDay - gameState.day;
-                        this.ctx.fillStyle = "#d32f2f";
-                        this.ctx.font = "18px monospace";
-                        this.ctx.fillText(`Days Remaining: ${daysLeft}`, cx, cy - h / 2 + 270);
-                    }
-
-                } else {
-                    this.ctx.font = "italic 20px monospace";
-                    this.ctx.fillStyle = "#555";
-                    this.ctx.fillText("No active Royal Directives.", cx, cy - h / 2 + 200);
-                }
-
-                // Close Hint
-                this.ctx.fillStyle = "#aaa";
-                this.ctx.font = "14px monospace";
-                this.ctx.fillText("[Click Reputation Icon to Close]", cx, cy + h / 2 - 20);
-            }
-
-            // Debug Overlays Removed (See debug_ui_reference.md)
-
-            drawInspectionWindow(data) {
-                const x = 50;
-                const y = 200;
-                const w = 300;
-                const h = 400;
-
-                // Panel
-                this.ctx.fillStyle = "rgba(0, 20, 40, 0.9)";
-                this.ctx.fillRect(x, y, w, h);
-                this.ctx.strokeStyle = "cyan";
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(x, y, w, h);
-
-                // Header
-                this.ctx.fillStyle = "cyan";
-                this.ctx.font = "bold 18px monospace";
-                this.ctx.textAlign = "left";
-                this.ctx.fillText("INSPECTION SCANNER", x + 15, y + 30);
-                this.ctx.fillRect(x + 15, y + 40, w - 30, 2);
-
-                // Name
-                this.ctx.fillStyle = "white";
-                this.ctx.font = "bold 16px monospace";
-                this.ctx.fillText(data.name, x + 15, y + 70);
-
-                // Details (with wrapping)
-                this.ctx.font = "14px monospace";
-                this.ctx.fillStyle = "#aaa";
-
-                let ly = y + 100;
-                const maxDetailWidth = w - 30;
-                const maxY = y + h - 20; // Prevent overflow
-                data.details.forEach(detail => {
-                    if (ly >= maxY) return; // Stop if we're out of space
-                    const prefix = '> ';
-                    const words = detail.split(' ');
-                    let line = prefix;
-                    words.forEach(word => {
-                        const testLine = line + word + ' ';
-                        if (this.ctx.measureText(testLine).width > maxDetailWidth) {
-                            if (ly < maxY) {
-                                this.ctx.fillText(line, x + 15, ly);
-                                ly += 20;
-                            }
-                            line = '  ' + word + ' '; // Indent continuation
-                        } else {
-                            line = testLine;
-                        }
-                    });
-                    if (ly < maxY) {
-                        this.ctx.fillText(line, x + 15, ly);
-                        ly += 25;
-                    }
+                    card.innerHTML = `
+                    <div class="roster-name">${member.name}</div>
+                    <div class="roster-class">Lvl ${member.level || 1} ${member.classId}</div>
+                    <div class="roster-status ${statusClass}">${status}</div>
+                `;
+
+                    DOM.rosterList.appendChild(card);
                 });
             }
 
-            drawReportCard(report) {
-                // Dim bg
-                this.ctx.fillStyle = "rgba(0,0,0,0.7)";
-                this.ctx.fillRect(0, 0, this.width, this.height);
+            // ================================================
+            // VISITOR FUNCTIONS
+            // ================================================
 
-                const cx = this.width / 2;
-                const cy = this.height / 2;
-                const w = 400;
-                const h = 300;
+            function showVisitorModal(visitorData) {
+                console.log('Visitor: Showing modal for', visitorData.name);
 
-                // Card body
-                this.ctx.fillStyle = "#fff";
-                this.ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
-                this.ctx.strokeStyle = "#444";
-                this.ctx.lineWidth = 4;
-                this.ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+                const modal = document.getElementById('visitor-modal');
+                const title = document.getElementById('visitor-title');
+                const dialogue = document.getElementById('visitor-dialogue');
+                const choicesContainer = document.getElementById('visitor-choices');
 
-                // Header
-                this.ctx.fillStyle = report.result === "SUCCESS" ? "green" : (report.result === "FAILURE" ? "red" : "orange");
-                this.ctx.font = "bold 30px monospace";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText(report.result, cx, cy - 80);
+                // Set content
+                title.textContent = visitorData.title || visitorData.name;
+                dialogue.textContent = visitorData.dialogue;
 
-                // Title
-                this.ctx.fillStyle = "#222";
-                this.ctx.font = "bold 18px monospace";
-                this.ctx.fillText(report.questTitle, cx, cy - 40);
+                // Clear previous choices
+                choicesContainer.innerHTML = '';
 
-                // Body
-                this.ctx.font = "14px monospace";
-                this.ctx.fillStyle = "#555";
+                // Create choice buttons
+                visitorData.choices.forEach((choice, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-large btn-grey';
+                    btn.textContent = choice.text;
 
-                // Text wrapping logic (simple)
-                const words = report.flavorText.split(' ');
-                let line = '';
-                let ly = cy + 10;
-                for (let n = 0; n < words.length; n++) {
-                    const testLine = line + words[n] + ' ';
-                    const metrics = this.ctx.measureText(testLine);
-                    if (metrics.width > w - 40 && n > 0) {
-                        this.ctx.fillText(line, cx, ly);
-                        line = words[n] + ' ';
-                        ly += 20;
-                    } else {
-                        line = testLine;
+                    // Check if player can afford
+                    if (choice.cost > 0 && gameState.economy.gold < choice.cost) {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                        btn.textContent += ' (Not enough gold)';
                     }
-                }
-                this.ctx.fillText(line, cx, ly);
 
-                // Button Prompt
-                this.ctx.fillStyle = "#888";
-                this.ctx.font = "12px monospace";
-                this.ctx.fillText("[Click to Continue]", cx, cy + 120);
-            }
-
-            drawDraggedQuest(dragState) {
-                const x = dragState.x;
-                const y = dragState.y;
-                const paperW = 240; // MUCH LARGER
-                const paperH = 300;
-
-                this.ctx.save();
-                this.ctx.translate(x, y);
-                this.ctx.rotate(-0.05);
-
-                // Shadow
-                this.ctx.shadowColor = "rgba(0,0,0,0.6)";
-                this.ctx.shadowBlur = 20;
-                this.ctx.shadowOffsetY = 20;
-
-                // Paper
-                this.ctx.fillStyle = "#f0e6d2";
-                this.ctx.fillRect(-paperW / 2, -paperH / 2, paperW, paperH);
-
-                // Border
-                this.ctx.strokeStyle = "#5d4037";
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(-paperW / 2, -paperH / 2, paperW, paperH);
-
-                // Title
-                this.ctx.fillStyle = "#3e2723";
-                this.ctx.font = "bold 20px 'MedievalSharp', cursive";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText(dragState.item.title, 0, -paperH / 2 + 35);
-
-                // Rank
-                this.ctx.fillStyle = "#b71c1c";
-                this.ctx.font = "bold 32px monospace";
-                this.ctx.fillText("RANK: " + dragState.item.rank, 0, -paperH / 2 + 70);
-
-                // Description
-                this.ctx.fillStyle = "#3e2723";
-                this.ctx.font = "14px monospace";
-                this.ctx.textAlign = "left";
-
-                const words = (dragState.item.desc || "").split(' ');
-                let line = '';
-                let ly = -paperH / 2 + 110;
-                const startX = -paperW / 2 + 15;
-                const maxWidth = paperW - 30;
-
-                words.forEach(word => {
-                    const testLine = line + word + ' ';
-                    if (this.ctx.measureText(testLine).width > maxWidth) {
-                        this.ctx.fillText(line, startX, ly);
-                        line = word + ' ';
-                        ly += 20;
-                    } else {
-                        line = testLine;
-                    }
+                    btn.onclick = () => handleVisitorChoice(visitorData, choice);
+                    choicesContainer.appendChild(btn);
                 });
-                this.ctx.fillText(line, startX, ly);
 
-                // Tags (with wrapping)
-                ly += 30;
-                this.ctx.font = "bold 12px monospace";
-                this.ctx.fillStyle = "#5d4037";
-                this.ctx.fillText("Tags:", startX, ly);
-                ly += 18;
-                this.ctx.font = "italic 11px monospace";
-                if (dragState.item.tags) {
-                    const tagText = dragState.item.tags.join(", ");
-                    let tagLine = '';
-                    const tagWords = tagText.split(', ');
-                    tagWords.forEach((tag, idx) => {
-                        const testLine = tagLine + (tagLine ? ', ' : '') + tag;
-                        if (this.ctx.measureText(testLine).width > maxWidth) {
-                            this.ctx.fillText(tagLine, startX, ly);
-                            ly += 16;
-                            tagLine = tag;
-                        } else {
-                            tagLine = testLine;
-                        }
-                    });
-                    if (tagLine) this.ctx.fillText(tagLine, startX, ly);
-                }
-
-                this.ctx.restore();
+                // Show modal
+                modal.classList.remove('hidden');
             }
 
-            getPortrait(hero) {
-                if (!hero.race || !hero.classId) return null;
+            function handleVisitorChoice(visitorData, choice) {
+                console.log('Visitor: Player chose:', choice.text);
 
-                // STRICT LIST OF NEW ASSETS
-                const VALID_ASSETS = [
-                    "dwarf_paladin_1.png", "dwarf_paladin_2.png", "dwarf_paladin_3.png", "dwarf_paladin_4.png", "dwarf_paladin_5.png",
-                    "elf_druid_female_1.jpg",
-                    "elf_mage_1.png",
-                    "elf_ranger_1.png", "elf_ranger_2.png", "elf_ranger_3.png",
-                    "human_assassin_1.png", "human_assassin_2.png", "human_assassin_3.png", "human_assassin_4.png",
-                    "human_cleric_male_1.png", "human_cleric_male_2.png",
-                    "human_knight_verdant_female_1.png",
-                    "human_knight_verdant_male_1.png", "human_knight_verdant_male_2.png", "human_knight_verdant_male_3.png",
-                    "human_necromancer_1.jpg", "human_necromancer_2.png", "human_necromancer_verdant_1.png",
-                    "human_paladin_2.png", "human_paladin_3.png", "human_paladin_4.png", "human_paladin_5.png", "human_paladin_6.png", "human_paladin_7.png",
-                    "human_paladin_female_1.jpg",
-                    "human_paladin_verdant_1.png", "human_paladin_verdant_2.png",
-                    "human_ranger_1.png",
-                    "human_rogue_male_2.png", "human_rogue_male_3.png",
-                    "human_warrior_male_1.png", "human_warrior_male_2.png", "human_warrior_male_3.png", "human_warrior_male_4.png", "human_warrior_male_5.png", "human_warrior_male_6.png", "human_warrior_male_7.png",
-                    "human_warrior_verdant_1.png",
-                    "human_wizard_male_1.jpg", "human_wizard_old_1.jpg",
-                    "orc_shaman_1.png",
-                    "orc_warrior_1.png"
-                ];
+                // Apply choice effects
+                const success = gameState.visitor.applyChoice(choice, gameState);
 
-                let candidates = [];
-                const race = (hero.race || "").toLowerCase();
-                const cls = (hero.visualClass || hero.classId || "").toLowerCase();
-
-                // 1. Try Fuzzy Match (Race + Class)
-                candidates = VALID_ASSETS.filter(f => f.includes(race) && f.includes(cls));
-
-                // 2. Class-Based Fallbacks (if specific file missing)
-                if (candidates.length === 0) {
-                    if (['knight', 'paladin', 'noble', 'monk', 'cleric'].includes(cls)) {
-                        candidates = VALID_ASSETS.filter(f => f.includes('paladin'));
-                    }
-                    else if (['necromancer', 'cultist', 'warlock', 'undead'].includes(cls)) {
-                        candidates = VALID_ASSETS.filter(f => f.includes('necromancer'));
-                    }
-                    else if (['wizard', 'elementalist', 'sorcerer', 'archmage', 'scholar', 'sage', 'illusionist', 'battle_mage'].includes(cls)) {
-                        candidates = VALID_ASSETS.filter(f => f.includes('wizard') || f.includes('mage'));
-                    }
-                    else if (['druid', 'hedge_wizard', 'ranger', 'hunter'].includes(cls)) {
-                        candidates = VALID_ASSETS.filter(f => f.includes('druid'));
-                    }
-                    else if (['warrior', 'mercenary', 'guard', 'soldier', 'ronin', 'pit_fighter'].includes(cls)) {
-                        candidates = VALID_ASSETS.filter(f => f.includes('warrior'));
-                    }
-                    else if (['rogue', 'spy', 'treasure_hunter', 'assassin', 'bard'].includes(cls)) {
-                        candidates = VALID_ASSETS.filter(f => f.includes('rogue'));
-                    }
+                if (!success) {
+                    alert("Not enough gold for this choice!");
+                    return;
                 }
 
-                if (candidates.length === 0) return null; // Fallback to Silhouette
-
-                // DETERMINISTIC SELECTION (Hash ID to Index)
-                let idx = 0;
-                if (hero.id) {
-                    let hash = 0;
-                    for (let i = 0; i < hero.id.length; i++) hash += hero.id.charCodeAt(i);
-                    idx = Math.abs(hash) % candidates.length;
+                // Show result text (optional)
+                if (choice.resultText) {
+                    alert(choice.resultText);
                 }
 
-                const filename = candidates[idx];
+                // Close modal
+                document.getElementById('visitor-modal').classList.add('hidden');
 
-                // Load/Cache
-                if (!this.portraits[filename]) {
-                    const img = new Image();
-                    img.src = `assets/portraits/${filename}`;
-                    this.portraits[filename] = img;
-                }
+                // Update gold display
+                updateGoldDisplay();
+                updateReputationDisplay();
 
-                return this.portraits[filename];
+                // Continue to normal day (load adventurers)
+                continueAfterVisitor();
             }
 
-            drawAdventurerPlaceholder(hero) {
-                const cx = this.width / 2;
-                const cy = this.height / 2 - 50;
+            function continueAfterVisitor() {
+                // Continue with the rest of startNewDay() logic
+                // Town Pool (weekly reset)
+                if (gameState.day === 1 || (gameState.day - 1) % 7 === 0) {
+                    gameState.town.generateWeeklyPool(gameState.day);
+                }
+                gameState.town.generateDailyQueue();
+                gameState.currentAdventurer = gameState.town.getNextVisitor();
 
-                // Try to load portrait sprite
-                const portrait = this.getPortrait(hero);
+                // Quests
+                if (window.GameData && window.GameData.Quests) {
+                    const count = Math.floor(Math.random() * 4) + 3; // 3-6
+                    gameState.quests = [...window.GameData.Quests].sort(() => 0.5 - Math.random()).slice(0, count);
 
-                if (portrait && portrait.complete && portrait.naturalWidth > 0) {
-                    // SPRITE-BASED RENDERING
-                    const size = 240; // Portrait size (increased from 220 for better presence)
-
-                    // Add subtle shadow/glow behind portrait for depth
-                    this.ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-                    this.ctx.shadowBlur = 20;
-                    this.ctx.shadowOffsetX = 0;
-                    this.ctx.shadowOffsetY = 10;
-
-                    // Draw portrait
-                    this.ctx.drawImage(
-                        portrait,
-                        cx - size / 2,
-                        cy - size / 2 - 50, // Slightly higher placement
-                        size,
-                        size
-                    );
-
-                    // Guild Member Badge (Top Left of Portrait)
-                    if (hero.isGuildMember) {
-                        const badgeX = cx - size / 2 + 10;
-                        const badgeY = cy - size / 2 - 50 + 10; // Relative to portrait top-left
-
-                        // Badge Background
-                        this.ctx.fillStyle = "#FFD700"; // Gold
-                        this.ctx.strokeStyle = "#fff";
-                        this.ctx.lineWidth = 2;
-                        this.ctx.beginPath();
-                        this.ctx.arc(badgeX + 15, badgeY + 15, 18, 0, Math.PI * 2);
-                        this.ctx.fill();
-                        this.ctx.stroke();
-
-                        // Badge Text
-                        this.ctx.fillStyle = "#000";
-                        this.ctx.font = "bold 20px monospace";
-                        this.ctx.textAlign = "center";
-                        this.ctx.fillText("G", badgeX + 15, badgeY + 22);
-                    }
-
-                    // Reset shadow
-                    this.ctx.shadowBlur = 0;
-                    this.ctx.shadowOffsetX = 0;
-                    this.ctx.shadowOffsetY = 0;
-
-                    // Add subtle visual overlays for special traits
-                    if (hero.visuals) {
-                        // BANDAGED (White strips overlays)
-                        if (hero.visuals.includes("bandaged")) {
-                            this.ctx.strokeStyle = "#eee";
-                            this.ctx.lineWidth = 4;
-                            this.ctx.beginPath();
-                            this.ctx.moveTo(cx - 50, cy + 30);
-                            this.ctx.lineTo(cx - 20, cy + 40);
-                            this.ctx.stroke();
+                    // Re-inject Crown Mandate if active
+                    if (gameState.crown && gameState.crown.activeQuest && gameState.crown.activeQuest.type === 'MANDATE') {
+                        const mandate = gameState.crown.activeQuest;
+                        if (mandate.status !== 'COMPLETED' && mandate.status !== 'FAILED') {
+                            gameState.quests.unshift(mandate);
                         }
-
-                        // SHAKING ANIMATION
-                        let offsetX = 0;
-                        if (hero.visuals.includes("shaking")) {
-                            offsetX = (Math.random() - 0.5) * 5; // Jitter
-                        }
-
-                        // Name label with strong outline for visibility
-                        this.ctx.strokeStyle = "black";
-                        this.ctx.lineWidth = 5;
-                        this.ctx.font = "bold 20px 'MedievalSharp', monospace";
-                        this.ctx.textAlign = "center";
-                        this.ctx.strokeText(hero.name, cx + offsetX, cy - 170);
-
-                        this.ctx.fillStyle = "#FFFFFF"; // White text
-                        this.ctx.fillText(hero.name, cx + offsetX, cy - 170);
                     }
-
                 } else {
-                    // FALLBACK: SILHOUETTE RENDERING (Original code)
-                    this.ctx.fillStyle = "rgba(50, 50, 50, 1.0)";
-
-                    if (hero.visuals && hero.visuals.includes("scrawny")) {
-                        this.ctx.fillStyle = "rgba(60, 60, 60, 1.0)";
-                    }
-
-                    this.ctx.beginPath();
-                    let width = 80;
-                    if (hero.visuals) {
-                        if (hero.visuals.includes("muscles")) width = 100;
-                        if (hero.visuals.includes("scrawny")) width = 60;
-                    }
-
-                    this.ctx.ellipse(cx, cy + 50, width, 180, 0, 0, Math.PI * 2);
-                    this.ctx.fill();
-
-                    // Visual tells
-                    if (hero.visuals) {
-                        if (hero.visuals.includes("glowing_eyes")) {
-                            this.ctx.shadowBlur = 10;
-                            this.ctx.shadowColor = "cyan";
-                            this.ctx.fillStyle = "cyan";
-                            this.ctx.beginPath();
-                            this.ctx.arc(cx - 20, cy - 80, 5, 0, Math.PI * 2);
-                            this.ctx.arc(cx + 20, cy - 80, 5, 0, Math.PI * 2);
-                            this.ctx.fill();
-                            this.ctx.shadowBlur = 0;
-                        }
-
-                        if (hero.visuals.includes("jewelry")) {
-                            this.ctx.strokeStyle = "gold";
-                            this.ctx.lineWidth = 3;
-                            this.ctx.beginPath();
-                            this.ctx.arc(cx, cy - 30, 40, 0, Math.PI, false);
-                            this.ctx.stroke();
-                            this.ctx.fillStyle = "red";
-                            this.ctx.beginPath();
-                            this.ctx.arc(cx, cy + 10, 8, 0, Math.PI * 2);
-                            this.ctx.fill();
-                        }
-
-                        if (hero.visuals.includes("pristine_armor")) {
-                            this.ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-                            this.ctx.beginPath();
-                            this.ctx.moveTo(cx - 30, cy);
-                            this.ctx.lineTo(cx + 30, cy + 20);
-                            this.ctx.lineTo(cx - 30, cy + 40);
-                            this.ctx.fill();
-                        }
-
-                        if (hero.visuals.includes("rusty_gear")) {
-                            this.ctx.fillStyle = "#8b4513";
-                            this.ctx.fillRect(cx - 40, cy + 20, 10, 10);
-                            this.ctx.fillRect(cx + 30, cy + 60, 15, 15);
-                        }
-
-                        if (hero.visuals.includes("bandaged")) {
-                            this.ctx.strokeStyle = "#eee";
-                            this.ctx.lineWidth = 4;
-                            this.ctx.beginPath();
-                            this.ctx.moveTo(cx - 50, cy + 50);
-                            this.ctx.lineTo(cx - 20, cy + 60);
-                            this.ctx.stroke();
-                            this.ctx.beginPath();
-                            this.ctx.moveTo(cx + 20, cy - 100);
-                            this.ctx.lineTo(cx + 50, cy - 90);
-                            this.ctx.stroke();
-                        }
-                    }
-
-                    // Name
-                    let offsetX = 0;
-                    if (hero.visuals && hero.visuals.includes("shaking")) {
-                        offsetX = (Math.random() - 0.5) * 5;
-                    }
-
-                    this.ctx.fillStyle = "#ffffff";
-                    this.ctx.font = "bold 20px 'MedievalSharp', monospace";
-                    this.ctx.textAlign = "center";
-                    this.ctx.shadowColor = "black";
-                    this.ctx.shadowBlur = 4;
-                    this.ctx.fillText(hero.name, cx + offsetX, cy - 150);
-                    this.ctx.shadowBlur = 0;
-
-                    // Question mark
-                    this.ctx.fillStyle = "#FFD700";
-                    this.ctx.font = "bold 48px monospace";
-                    this.ctx.fillText("?", cx, cy + 60);
+                    gameState.quests = [];
                 }
+
+                // Render
+                renderCharacter();
+                renderQuests();
+                updateGoldDisplay();
             }
 
-            drawQuestBoard(quests) {
-                if (!quests || quests.length === 0) return;
+            // ================================================
+            // QUEST UI FUNCTIONS
+            // ================================================
 
-                // Board Area (Calculated)
-                const startX = 640;
-                const startY = 220;
-                const paperW = 100;
-                const paperH = 130;
-                const gap = 15;
-                const cols = 3;
+            function showQuestDetails(quest) {
+                console.log('Quest: Showing details for', quest.title);
 
-                this.ctx.save();
-                this.ctx.shadowColor = "rgba(0,0,0,0.5)";
-                this.ctx.shadowBlur = 2;
-                this.ctx.shadowOffsetX = 2;
-                this.ctx.shadowOffsetY = 2;
+                const modal = document.getElementById('quest-details-modal');
+                const title = document.getElementById('quest-detail-title');
+                const desc = document.getElementById('quest-detail-desc');
+                const hazard = document.getElementById('quest-detail-hazard');
+                const meta = document.getElementById('quest-detail-meta');
 
-                quests.forEach((quest, index) => {
-                    // Skip if currently being dragged (implied by Input logic, need to check logic)
-                    if (gameState.dragState && gameState.dragState.item === quest) return;
+                title.textContent = quest.title;
+                desc.textContent = quest.desc || quest.description || 'No description available.';
 
-                    const col = index % cols;
-                    const row = Math.floor(index / cols);
-                    const x = startX + col * (paperW + gap);
-                    const y = startY + row * (paperH + gap) + (index % 2 * 5); // Slight stagger
-
-                    // Paper Background
-                    this.ctx.fillStyle = "#f0e6d2"; // Parchment
-                    this.ctx.fillRect(x, y, paperW, paperH);
-
-                    // Title (readable)
-                    this.ctx.fillStyle = "#3e2723";
-                    this.ctx.font = "bold 11px monospace";
-                    this.ctx.textAlign = "center";
-                    const words = quest.title.split(' ');
-                    if (words.length > 2) {
-                        this.ctx.fillText(words.slice(0, 2).join(' '), x + paperW / 2, y + 25);
-                        this.ctx.fillText(words.slice(2).join(' '), x + paperW / 2, y + 40);
-                    } else {
-                        this.ctx.fillText(quest.title, x + paperW / 2, y + 30);
-                    }
-
-                    // Rank Label (Large)
-                    this.ctx.fillStyle = "#b71c1c";
-                    this.ctx.font = "bold 32px monospace";
-                    this.ctx.fillText(quest.rank, x + paperW / 2, y + paperH / 2 + 20);
-
-                    // Seal at bottom
-                    this.ctx.fillStyle = (quest.rank === 'S' || quest.rank === 'A') ? "#8b0000" : "#4a3728";
-                    this.ctx.beginPath();
-                    this.ctx.arc(x + paperW / 2, y + paperH - 20, 10, 0, Math.PI * 2);
-                    this.ctx.fill();
-                });
-                this.ctx.restore();
-            }
-        }
-
-        // 5. MAIN LOOP
-        const canvas = document.getElementById('game-canvas');
-        canvas.width = 1024;
-        canvas.height = 768;
-        const renderer = new Renderer(canvas);
-
-        let gameState = {
-            screen: 'START', // START, GAME, REPORT
-            day: 1,
-            reputation: 50, // CROWN REPUTATION (0-100)
-            crown: {
-                nextVisitDay: 3,
-                activeQuest: null,
-                history: []
-            },
-            currentAdventurer: null,
-            pendingReports: [] // Stores results from the day
-        };
-
-        function startGame() {
-            gameState.screen = 'GAME';
-            startNewDay();
-        }
-
-        function startNewDay() {
-            gameState.day++;
-            gameState.pendingReports = []; // Clear previous day's reports
-
-            // RESET DAILY ASSIGNMENTS (User Fix)
-            if (gameState.persistence) {
-                gameState.persistence.resetDailyState();
-            }
-
-            // CROWN CHECK (Day 7 Loop)
-            if (window.GameSystems.CrownSystem && !gameState.crownSystem) {
-                gameState.crownSystem = new window.GameSystems.CrownSystem();
-            }
-            if (gameState.crownSystem) {
-                // Safety: Ensure data exists
-                if (!gameState.crown) gameState.crown = { nextVisitDay: 3, activeQuest: null, history: [] };
-
-                const crownEvent = gameState.crownSystem.checkDaily(gameState);
-                if (crownEvent) {
-                    gameState.crownEvent = crownEvent; // Store event to Render
-                    gameState.screen = 'CROWN_EVENT'; // Block game until resolved
-                    console.log("Crown Event Triggered:", crownEvent);
-                    return; // PAUSE day start until event handled
+                // Hazard warning
+                if (quest.hazard || quest.risk) {
+                    hazard.textContent = `⚠️ ${quest.hazard || quest.risk}`;
+                } else {
+                    hazard.textContent = '';
                 }
-            }
 
-            // Generate Adventurer (OLD)
-            // gameState.currentAdventurer = AdventurerGenerator.generate(gameState.day);
-
-            // NEW TOWN LOGIC
-            // Generate Weekly Pool on Day 1 (or 8, 15...)
-            if (gameState.day === 1 || (gameState.day - 1) % 7 === 0) {
-                gameState.town.generateWeeklyPool(gameState.day);
-            }
-            // Generate Daily Queue
-            gameState.town.generateDailyQueue();
-
-            // Get first visitor
-            // chance for returning member is handled in 'nextAdventurer', 
-            // but for first slot of day, let's just pull from town or set null and let user click?
-            // Let's autopull first visitor.
-            gameState.currentAdventurer = gameState.town.getNextVisitor();
-
-            // Mark as busy immediately to prevent double-assignment logic (Safe default)
-            // if (gameState.currentAdventurer) gameState.currentAdventurer.isAssigned = false;
-
-            // Load Quests (from Data Layer)
-            if (window.GameData && window.GameData.Quests) {
-                // Shuffle and pick 3-6
-                // Shuffle and pick 3-6
-                const count = Math.floor(Math.random() * 4) + 3;
-                gameState.quests = [...window.GameData.Quests].sort(() => 0.5 - Math.random()).slice(0, count);
-
-                // FIX: Re-inject Active Crown Mandate (if lost during shuffle)
-                if (gameState.crown && gameState.crown.activeQuest && gameState.crown.activeQuest.type === 'MANDATE') {
-                    const mandate = gameState.crown.activeQuest;
-                    // Check if completed/failed? handled by Resolution.
-                    if (mandate.status !== 'COMPLETED' && mandate.status !== 'FAILED') {
-                        // Add to top of board
-                        gameState.quests.unshift(mandate);
-                    }
+                // Metadata (type, rank, requirements)
+                let metaText = `Type: ${quest.type || 'Unknown'} | Rank: ${quest.rank || '?'} | Req: ${quest.primary_stat || 'STR'}`;
+                if (quest.best_class && quest.best_class.length > 0) {
+                    metaText += `\nBest for: ${quest.best_class.join(', ')}`;
                 }
-            } else {
-                console.warn("Quests not loaded!");
-                gameState.quests = [];
+                meta.textContent = metaText;
+
+                modal.classList.remove('hidden');
+
+                // Click outside modal to close (UX improvement)
+                modal.onclick = (e) => {
+                    if (e.target === modal) {
+                        modal.classList.add('hidden');
+                    }
+                };
             }
-        }
 
-        async function init() {
-            document.getElementById('debug-console').style.display = 'none';
-            await renderer.loadAssets();
-
-            // Initialize Systems
-            gameState.economy = new window.GameSystems.EconomyManager(50);
-            gameState.inspector = new window.GameSystems.Inspector();
-            gameState.persistence = new window.GameSystems.PersistenceManager(); // NEW
-            gameState.events = new window.GameSystems.EventManager(); // NEW
-            gameState.town = new window.GameSystems.TownManager(); // NEW
-            gameState.crownSystem = new window.GameSystems.CrownSystem(); // NEW: Crown Logic
-            const input = new window.GameSystems.InputController(canvas, gameState);
-
-            // Event: Next Adventurer (Same Day)
-            document.addEventListener('nextAdventurer', (e) => {
-                const delay = e.detail && e.detail.delay ? e.detail.delay : 0;
-
-                setTimeout(() => {
-                    let nextHero = null;
-                    const roll = Math.random();
-
-                    // 1. Try Guild Return (30%)
-                    if (roll < 0.3) {
-                        const data = gameState.persistence.getReturningAdventurer();
-                        if (data) nextHero = new window.GameSystems.Adventurer(data);
-                    }
-
-                    // 2. If no guild member (or roll failed), Try Town Visitor
-                    if (!nextHero) {
-                        nextHero = gameState.town.getNextVisitor();
-
-                        // If Town Queue is empty, fallback to Guild Member (if any)
-                        if (!nextHero) {
-                            const data = gameState.persistence.getReturningAdventurer();
-                            if (data) nextHero = new window.GameSystems.Adventurer(data);
-                        }
-                    }
-
-                    gameState.currentAdventurer = nextHero;
-
-                    // Mark as Seen Today (prevents cycling if dismissed)
-                    if (nextHero) {
-                        nextHero.lastSeenDay = gameState.day;
-                        // Force Persistence Update if Guild Member
-                        if (nextHero.isGuildMember && gameState.persistence) {
-                            gameState.persistence.roster.set(nextHero.id, nextHero);
-                        }
-                    }
-
-                    if (!gameState.currentAdventurer) {
-                        console.log("The Hall is empty. No more visitors today.");
-                    } else {
-                        console.log("Next Adventurer:", gameState.currentAdventurer.name);
-                    }
-                }, delay);
+            document.getElementById('btn-close-quest-details')?.addEventListener('click', () => {
+                document.getElementById('quest-details-modal').classList.add('hidden');
             });
 
-            // Event: Manual End Day
-            document.addEventListener('endDayManual', () => {
+            // ================================================
+            // GAME FLOW FUNCTIONS (from Canvas version)
+            // ================================================
+
+            function startGame() {
+                gameState.day = 1;
+                setScreen('game');
+                startNewDay();
+            }
+
+            function startNewDay() {
+                console.log(`=== DAY ${gameState.day} ===`);
+
+                // Clear previous day's reports
+                gameState.pendingReports = [];
+
+                // Crown Check
+                if (gameState.crownSystem) {
+                    if (!gameState.crown) gameState.crown = { nextVisitDay: 3, activeQuest: null, history: [] };
+                    const crownEvent = gameState.crownSystem.checkDaily(gameState);
+                    if (crownEvent) {
+                        gameState.crownEvent = crownEvent;
+                        setScreen('crownEvent');
+                        document.getElementById('crown-event-title').textContent = crownEvent.title || 'Royal Messenger';
+                        document.getElementById('crown-event-text').textContent = crownEvent.message || 'The Crown has a message for you.';
+                        return;
+                    }
+                }
+
+                // Morning Visitor Check (before adventurers)
+                if (gameState.visitor) {
+                    const visitor = gameState.visitor.checkForVisitor(gameState.day);
+                    if (visitor) {
+                        showVisitorModal(visitor);
+                        return; // Wait for visitor interaction
+                    }
+                }
+
+                // Town Pool (weekly reset)
+                if (gameState.day === 1 || (gameState.day - 1) % 7 === 0) {
+                    gameState.town.generateWeeklyPool(gameState.day);
+                }
+                gameState.town.generateDailyQueue();
+                gameState.currentAdventurer = gameState.town.getNextVisitor();
+
+                // Quests
+                if (window.GameData && window.GameData.Quests) {
+                    const count = Math.floor(Math.random() * 4) + 3; // 3-6
+                    gameState.quests = [...window.GameData.Quests].sort(() => 0.5 - Math.random()).slice(0, count);
+
+                    // Re-inject Crown Mandate if active
+                    if (gameState.crown && gameState.crown.activeQuest && gameState.crown.activeQuest.type === 'MANDATE') {
+                        const mandate = gameState.crown.activeQuest;
+                        if (mandate.status !== 'COMPLETED' && mandate.status !== 'FAILED') {
+                            gameState.quests.unshift(mandate);
+                        }
+                    }
+                } else {
+                    gameState.quests = [];
+                }
+
+                // Render
+                renderCharacter();
+                renderQuests();
+                updateGoldDisplay();
+            }
+
+            function endDay() {
+                // Collect quest rewards FIRST (before upkeep)
+                if (gameState.pendingReports && gameState.pendingReports.length > 0) {
+                    let totalGold = 0;
+                    gameState.pendingReports.forEach(report => {
+                        totalGold += report.goldEarned || 0;
+                    });
+                    if (totalGold > 0 && gameState.economy) {
+                        gameState.economy.addGold(totalGold);
+                        console.log(`Collected ${totalGold} gold from quests`);
+                    }
+                }
+
                 // Process Upkeep
                 const upkeep = gameState.economy.processDailyUpkeep();
-                gameState.lastUpkeep = upkeep; // Store for report display
+                gameState.lastUpkeep = upkeep;
 
-                // Roll Daily Event
+                // Roll Event
                 if (gameState.events) {
                     gameState.dailyEvent = gameState.events.rollEvent(gameState);
                 }
@@ -1932,17 +800,26 @@
                     return;
                 }
 
-                gameState.screen = 'REPORT';
-                gameState.reportOpenedAt = Date.now(); // Prevent immediate click-through
-            });
+                // Update gold display before showing report
+                updateGoldDisplay();
 
-            // Event: Recruit Adventurer (Manual)
-            document.addEventListener('recruitAdventurer', () => {
-                console.log("Event: recruitAdventurer triggered");
+                setScreen('report');
+                renderReport();
+                gameState.reportOpenedAt = Date.now();
+            }
 
+            function nextDay() {
+                // Gold already collected in endDay() - removed duplicate
+
+                gameState.day++;
+                setScreen('game');
+                startNewDay();
+            }
+
+            function hireAdventurer() {
                 const hero = gameState.currentAdventurer;
                 if (!hero) {
-                    console.error("No adventurer to recruit!");
+                    console.error("No adventurer to hire!");
                     return;
                 }
 
@@ -1951,153 +828,275 @@
                     return;
                 }
 
-                // CHECK LIMIT (Max 12 ACTIVE members. Dead do not count.)
+                // Check limit
                 const rosterArr = Array.from(gameState.persistence.roster.values());
                 const activeCount = rosterArr.filter(m => !m.isDead).length;
-
                 if (activeCount >= 12) {
-                    alert(`Guild is full! Active Members: ${activeCount}/12. (Deceased members do not count). Dismiss someone to hire more.`);
+                    alert(`Guild is full! Active Members: ${activeCount}/12.`);
                     return;
                 }
 
-                // Direct Gold Deduction (Safer)
+                // Deduct gold
                 gameState.economy.gold -= 100;
 
-                // Recruit THIS adventurer
+                // Recruit
                 hero.isGuildMember = true;
-                gameState.town.recruit(hero.id); // Remove from Town Pool
+                gameState.town.recruit(hero.id);
 
-                // CROWN QUEST LOGIC: TALENT SCOUT
+                // Crown quest logic
                 if (gameState.crown && gameState.crown.activeQuest && gameState.crown.activeQuest.type === 'TALENT_SCOUT') {
-                    // Mark this recruit for the quest (ID BASED)
                     if (!gameState.crown.activeQuest.targetRecruitId) {
                         gameState.crown.activeQuest.targetRecruitId = hero.id;
                         gameState.crown.activeQuest.targetRecruitName = hero.name;
-                        console.log("Crown Quest Tracked ID:", hero.id);
                     }
-                    hero.isCrownRecruit = true; // Keep visual tag
-                    console.log("Recruited Crown Candidate:", hero.name);
+                    hero.isCrownRecruit = true;
                 }
 
-                // Add to Roster Persistence
                 gameState.persistence.addToRoster(hero);
+                updateGoldDisplay();
 
-                // Visual Feedback
-                gameState.stamp = { type: 'HIRED', val: 0 };
+                // Mark as hired (stays visible for quest assignment)
+                hero.status = 'HIRED_TODAY';
+                renderCharacter(); // Re-render to show "HIRED" badge
 
-                // Clear stamp after 800ms (same as Assigned)
-                setTimeout(() => {
-                    if (gameState.stamp && gameState.stamp.type === 'HIRED') {
-                        gameState.stamp = null;
-                    }
-                }, 800);
+                // Note: Adventurer stays on screen for quest assignment
+                // Use DISMISS or END DAY buttons to advance to next visitor
+            }
 
-                if (gameState.persistence) {
-                    gameState.persistence.addToRoster(hero);
-                }
-            });
+            function dismissAdventurer() {
+                const current = gameState.currentAdventurer;
 
-            // Toggle Crown Status
-            document.addEventListener('toggleCrownStatus', () => {
-                gameState.crownStatusOpen = !gameState.crownStatusOpen;
-                // Loop handles redraw
-            });
-
-            // Resume Day (Continue after Crown Event)
-            document.addEventListener('resumeDay', () => {
-                // Determine if we need to advance logic or just resume
-                // Crown Event in startNewDay returns early.
-                // So we should call startNewDay() again to proceed with Daily Logic.
-                // But we must ensure specific flags don't trigger again.
-                // startNewDay uses gameState.day.
-                // If we call it again, it checks Crown.
-                // checkDaily checks 'nextVisitDay'.
-                // If handleVisit updated nextVisitDay (it did), then checkDaily returns null.
-                // So startNewDay proceeds to Normal Daily Logic.
-                startNewDay();
-            });
-
-            // Event: Toggle Roster
-            document.addEventListener('toggleRoster', () => {
-                if (gameState.screen === 'GAME') {
-                    gameState.screen = 'ROSTER';
-                    gameState.rosterOpenedAt = Date.now(); // Prevent immediate closing
-                } else if (gameState.screen === 'ROSTER') {
-                    gameState.screen = 'GAME';
-                }
-            });
-
-            // Input (Keyboard still useful for debug/start)
-            window.addEventListener('keydown', (e) => {
-                if (gameState.screen === 'START') {
-                    if (e.code === 'Space' || e.code === 'Enter') startGame();
-                } else if (gameState.screen === 'GAME') {
-                    // if (e.code === 'Space') startNewDay(); // Disable space to skip
-                } else if (gameState.screen === 'ROSTER') {
-                    if (e.code === 'Escape' || e.code === 'Space') gameState.screen = 'GAME';
-                } else if (gameState.screen === 'REPORT') {
-                    if (e.code === 'Space') {
-                        // Collect gold from completed quests
-                        if (gameState.pendingReports && gameState.pendingReports.length > 0) {
-                            let totalGold = 0;
-                            gameState.pendingReports.forEach(report => {
-                                totalGold += report.goldEarned || 0;
-                            });
-                            if (totalGold > 0 && gameState.economy) {
-                                gameState.economy.addGold(totalGold);
-                                console.log(`Day complete! Earned ${totalGold} gold from ${gameState.pendingReports.length} quests`);
-                            }
+                // Clear any quests assigned to this visitor
+                if (current && current.isAssigned) {
+                    gameState.quests.forEach(quest => {
+                        if (quest.assignedTo === current.id) {
+                            quest.assignedTo = null;
+                            quest.assignedName = null;
                         }
-
-                        gameState.screen = 'GAME';
-                        startNewDay();
-                    }
+                    });
                 }
-            });
 
-            // Mouse Click for Start and Report
-            canvas.addEventListener('click', (e) => { // Captured e
-                if (gameState.screen === 'START') startGame();
-                // ROSTER Handled by Input.js
-                else if (gameState.screen === 'ROSTER') {
-                    // DELEGATED TO Input.js
+                // Get next visitor
+                gameState.currentAdventurer = gameState.town.getNextVisitor();
+                renderCharacter();
+                renderQuests();
+            }
+
+            // ================================================
+            // QUEST ASSIGNMENT (Direct to Current Visitor)
+            // ================================================
+
+            function getNextVisitor() {
+                if (!gameState.town || gameState.town.dailyQueue.length === 0) {
+                    gameState.currentAdventurer = null;
+                    renderCharacter();
                     return;
                 }
-                else if (gameState.screen === 'REPORT') {
-                    // Prevent click-through: require 300ms delay after report opens
-                    if (gameState.reportOpenedAt && Date.now() - gameState.reportOpenedAt < 300) {
-                        return; // Ignore click
-                    }
+                gameState.currentAdventurer = gameState.town.getNextVisitor();
+                renderCharacter();
+            }
 
-                    // Collect gold from completed quests
-                    if (gameState.pendingReports && gameState.pendingReports.length > 0) {
-                        let totalGold = 0;
-                        gameState.pendingReports.forEach(report => {
-                            totalGold += report.goldEarned || 0;
-                        });
-                        if (totalGold > 0 && gameState.economy) {
-                            gameState.economy.addGold(totalGold);
-                            console.log(`Day complete! Earned ${totalGold} gold from ${gameState.pendingReports.length} quests`);
-                        }
-                    }
-
-                    gameState.screen = 'GAME';
-                    startNewDay();
+            function assignQuestToVisitor(quest, questIndex) {
+                const visitor = gameState.currentAdventurer;
+                if (!visitor) {
+                    console.error("No visitor at desk!");
+                    return;
                 }
+
+                // Validation: Check if visitor already has a quest
+                if (visitor.isAssigned && visitor.currentQuest !== null) {
+                    console.warn(`${visitor.name} already has a quest assigned!`);
+                    return;
+                }
+
+                // Validation: Check if quest is already assigned
+                if (quest.assignedTo) {
+                    console.warn(`Quest "${quest.title}" is already assigned!`);
+                    return;
+                }
+
+                console.log(`✅ Assigning "${quest.title}" to ${visitor.name}`);
+
+                // Mark as assigned
+                visitor.isAssigned = true;
+                visitor.currentQuest = questIndex;
+
+                // Process with Resolution System
+                if (window.GameSystems && window.GameSystems.ResolutionManager) {
+                    visitor.economyRef = gameState.economy;
+                    const result = window.GameSystems.ResolutionManager.resolve(quest, visitor);
+
+                    // Store result for end-of-day report
+                    if (!gameState.pendingReports) gameState.pendingReports = [];
+                    gameState.pendingReports.push(result);
+                    console.log(`Quest resolved: ${result.result}`);
+                }
+
+                // Remove quest from board
+                gameState.quests.splice(questIndex, 1);
+
+                // Re-render quests
+                renderQuests();
+
+                // AUTO-PROGRESS: Show next visitor after brief delay
+                setTimeout(() => {
+                    getNextVisitor();
+                }, 300);
+            }
+
+            // ================================================
+            // EVENT LISTENERS
+            // ================================================
+
+            document.getElementById('btn-start').addEventListener('click', startGame);
+            document.getElementById('btn-hire').addEventListener('click', hireAdventurer);
+            document.getElementById('btn-dismiss').addEventListener('click', dismissAdventurer);
+            document.getElementById('btn-end-day').addEventListener('click', endDay);
+            document.getElementById('btn-next-day').addEventListener('click', nextDay);
+            document.getElementById('btn-roster-toggle').addEventListener('click', () => {
+                setScreen('roster');
+                renderRoster();
+            });
+            document.getElementById('btn-close-roster').addEventListener('click', () => {
+                setScreen('game');
+            });
+            document.getElementById('btn-acknowledge-crown').addEventListener('click', () => {
+                setScreen('game');
+                startNewDay(); // Resume
             });
 
-            gameLoop();
-        }
+            // ================================================
+            // ADVENTURER DATA (Inline - ES6 module not loading)
+            // ================================================
 
-        function gameLoop() {
-            renderer.draw(gameState);
-            requestAnimationFrame(gameLoop);
-        }
+            window.ADVENTURER_DATA = {
+                archetypes: {
+                    MARTIAL: {
+                        name: "Martial",
+                        classes: [
+                            { id: "knight", name: "Knight-Errant", traits: ["Honorbound", "Arrogant"], stats: { str: [8, 10], int: [2, 5], dex: [4, 6] } },
+                            { id: "barbarian", name: "Barbarian", traits: ["Battle-Rage", "Illiterate"], stats: { str: [9, 10], int: [1, 3], dex: [5, 7] } },
+                            { id: "mercenary", name: "Mercenary", traits: ["Greedy", "Pragmatic"], stats: { str: [6, 8], int: [4, 6], dex: [5, 7] } },
+                            { id: "guard", name: "Town Guard", traits: ["Lazy", "Corrupt"], stats: { str: [5, 7], int: [3, 5], dex: [4, 6] } }
+                        ]
+                    },
+                    ARCANE: {
+                        name: "Arcane",
+                        classes: [
+                            { id: "battle_mage", name: "Battle Mage", traits: ["Pyromaniac", "Short-Tempered"], stats: { str: [4, 6], int: [8, 10], dex: [4, 6] } },
+                            { id: "scholar", name: "Scholar", traits: ["Cowardly", "Curious"], stats: { str: [2, 4], int: [9, 10], dex: [3, 5] } },
+                            { id: "necromancer", name: "Necromancer", traits: ["Outcast", "Creepy"], stats: { str: [3, 5], int: [8, 10], dex: [3, 5] } }
+                        ]
+                    },
+                    CUNNING: {
+                        name: "Cunning",
+                        classes: [
+                            { id: "rogue", name: "Rogue", traits: ["Greedy", "Traitor"], stats: { str: [3, 5], int: [5, 7], dex: [8, 10] } },
+                            { id: "ranger", name: "Ranger", traits: ["Loner", "Nature-Lover"], stats: { str: [5, 7], int: [4, 6], dex: [8, 10] } },
+                            { id: "assassin", name: "Assassin", traits: ["Cold-Blooded", "Contract_Killer"], stats: { str: [5, 7], int: [6, 8], dex: [9, 10] } }
+                        ]
+                    },
+                    DIVINE: {
+                        name: "Divine",
+                        classes: [
+                            { id: "cleric", name: "Cleric", traits: ["Zealot", "Pacifist"], stats: { str: [5, 7], int: [7, 9], dex: [3, 5] } },
+                            { id: "paladin", name: "Paladin", traits: ["Lawful Stupid", "Judgemental"], stats: { str: [8, 10], int: [4, 6], dex: [4, 6] } },
+                            { id: "monk", name: "Monk", traits: ["Vow of Silence", "Disciplined"], stats: { str: [7, 9], int: [6, 8], dex: [9, 10] } }
+                        ]
+                    }
+                }
+            };
 
-        // Start immediately
-        init();
-    </script>
-    <!-- REMOVED script.js import -->
+            // ================================================
+            // ADVENTURER GENERATOR (Inline for compatibility)
+            // ================================================
+
+            class AdventurerGenerator {
+                static generate(day = 1) {
+                    if (!window.ADVENTURER_DATA) {
+                        console.error("ADVENTURER_DATA not loaded!");
+                        return null;
+                    }
+
+                    const archetypeKeys = Object.keys(ADVENTURER_DATA.archetypes);
+                    const archetypeKey = archetypeKeys[Math.floor(Math.random() * archetypeKeys.length)];
+                    const archetypeData = ADVENTURER_DATA.archetypes[archetypeKey];
+                    const charClass = archetypeData.classes[Math.floor(Math.random() * archetypeData.classes.length)];
+
+                    const stats = {
+                        str: this.randomRange(charClass.stats.str[0], charClass.stats.str[1]),
+                        int: this.randomRange(charClass.stats.int[0], charClass.stats.int[1]),
+                        dex: this.randomRange(charClass.stats.dex[0], charClass.stats.dex[1]),
+                        vit: this.randomRange(3, 8)
+                    };
+
+                    const traits = [...charClass.traits];
+                    const race = this.pickRaceForClass(charClass.id);
+                    const equipment = { mainHand: "Basic Weapon", armor: "Basic Armor" };
+
+                    const names = ["Garrett", "Lyra", "Thorn", "Elara", "Ragnar", "Sylas", "Kael", "Mira"];
+                    const name = names[Math.floor(Math.random() * names.length)] + " the " + charClass.name;
+
+                    // Use Adventurer constructor from models/Adventurer.js
+                    return new window.GameSystems.Adventurer({
+                        name: name,
+                        archetype: archetypeKey,
+                        classId: charClass.id,
+                        race: race,
+                        stats: stats,
+                        traits: traits,
+                        equipment: equipment
+                    });
+                }
+
+                static pickRaceForClass(classId) {
+                    const raceMap = {
+                        warrior: 'human', knight: 'human', barbarian: 'orc',
+                        guard: 'human', pit_fighter: 'human', ronin: 'human', mercenary: 'human',
+                        battle_mage: 'elf', scholar: 'elf', necromancer: 'human',
+                        illusionist: 'elf', elementalist: 'elf', hedge_wizard: 'elf',
+                        rogue: 'human', ranger: 'elf', bard: 'human',
+                        assassin: 'human', treasure_hunter: 'human', spy: 'human',
+                        cleric: 'human', paladin: 'dwarf', druid: 'elf',
+                        monk: 'human', cultist: 'human'
+                    };
+                    return raceMap[classId] || 'human';
+                }
+
+                static randomRange(min, max) {
+                    return Math.floor(Math.random() * (max - min + 1)) + min;
+                }
+            }
+
+            // Register globally for Town system
+            window.GameSystems = window.GameSystems || {};
+            window.GameSystems.AdventurerGenerator = AdventurerGenerator;
+
+            // ================================================
+            // INIT
+            // ================================================
+
+            async function init() {
+                console.log('🎮 Initializing Guild Master Mobile...');
+
+                // Initialize Systems
+                gameState.economy = new window.GameSystems.EconomyManager(100); // Start with 100 gold
+                gameState.inspector = new window.GameSystems.Inspector();
+                gameState.persistence = new window.GameSystems.PersistenceManager();
+                gameState.events = new window.GameSystems.EventManager();
+                gameState.town = new window.GameSystems.TownManager();
+                gameState.crownSystem = new window.GameSystems.CrownSystem();
+                gameState.visitor = new window.GameSystems.VisitorSystem();
+
+                console.log('✅ All systems initialized');
+                console.log('📊 AdventurerGenerator registered:', !!window.GameSystems.AdventurerGenerator);
+                console.log('📊 Quest Data loaded:', window.GameData?.Quests?.length || 0, 'quests');
+                console.log('🎮 Game ready! Click START to begin.');
+            }
+
+            init();
+        </script>
+
 </body>
 
 </html>

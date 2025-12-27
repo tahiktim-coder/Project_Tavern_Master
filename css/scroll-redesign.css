@@ -1,0 +1,63 @@
+/* QUEST SCROLL - ROLLED PARCHMENT DESIGN */
+.quest-scroll {
+    background:
+        /* Aged coffee stains */
+        radial-gradient(ellipse at 25% 35%, rgba(101, 67, 33, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 75% 65%, rgba(139, 69, 19, 0.12) 0%, transparent 30%),
+        /* Paper fiber texture */
+        repeating-linear-gradient(0deg,
+            rgba(139, 115, 85, 0.15) 0px,
+            transparent 1px,
+            transparent 2px),
+        /* Aged parchment gradient */
+        linear-gradient(135deg,
+            #f5ead6 0%,
+            #ecdcbf 25%,
+            #d4b896 50%,
+            #ecdcbf 75%,
+            #f5ead6 100%);
+
+    /* Thick dark borders for rolled edges */
+    border: none;
+    border-left: 6px ridge #6d4c41;
+    border-right: 6px ridge #6d4c41;
+    border-top: 3px solid #8b6839;
+    border-bottom: 3px solid #8b6839;
+
+    border-radius: 4px;
+    padding: 20px 18px;
+    margin: 10px 0;
+    cursor: grab;
+    position: relative;
+
+    /* Strong 3D shadow */
+    box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.8),
+        inset 0 2px 0 rgba(255, 255, 255, 0.6),
+        inset 0 -3px 8px rgba(0, 0, 0, 0.15);
+
+    transform: rotate(-0.3deg);
+    transition: all 0.2s ease;
+}
+
+/* Wax seal stamp */
+.quest-scroll .scroll-title::before {
+    content: '🗡️ ';
+    font-size: 0.8em;
+    opacity: 0.6;
+}
+
+.quest-scroll:hover {
+    transform: translateY(-3px) rotate(0deg);
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.9),
+        inset 0 2px 0 rgba(255, 255, 255, 0.7);
+}
+
+.quest-scroll:active {
+    transform: scale(0.97) rotate(-0.5deg);
+    box-shadow:
+        0 3px 10px rgba(0, 0, 0, 0.7),
+        inset 0 2px 0 rgba(255, 255, 255, 0.5);
+    cursor: grabbing;
+}

@@ -52,6 +52,37 @@ class Inspector {
             details: descriptions
         };
     }
+
+    // Display adventurer details via modal UI (not alert!)
+    show(adventurer) {
+        const data = this.inspect(adventurer);
+        if (!data) {
+            console.warn("No adventurer to inspect!");
+            return;
+        }
+
+        // Format the details for display
+        const message = `=== ${data.name} ===\n\n${data.details.join('\n')}`;
+
+        // Display in modal instead of alert
+        const modal = document.getElementById('inspector-modal');
+        const content = document.getElementById('inspector-content');
+        const closeBtn = document.getElementById('btn-close-inspector');
+
+        if (!modal || !content) {
+            // Fallback to alert if modal doesn't exist
+            alert(message);
+            return;
+        }
+
+        content.textContent = message;
+        modal.classList.remove('hidden');
+
+        // Close button handler
+        closeBtn.onclick = () => {
+            modal.classList.add('hidden');
+        };
+    }
 }
 
 window.GameSystems.Inspector = Inspector;
