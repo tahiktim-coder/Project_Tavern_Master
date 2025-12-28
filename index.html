@@ -1019,6 +1019,119 @@
             }
 
             // ================================================
+            // ROSTER RENDERING
+            // ================================================
+
+            function renderRoster() {
+                const list = DOM.rosterList;
+                list.innerHTML = '';
+
+                if (!gameState.persistence || !gameState.persistence.roster) {
+                    list.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">No guild members yet</p>';
+                    return;
+                }
+
+                const members = Array.from(gameState.persistence.roster.values());
+
+                if (members.length === 0) {
+                    list.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">No guild members yet</p>';
+                    return;
+                }
+
+                members.forEach(member => {
+                    const row = document.createElement('div');
+                    row.className = 'roster-row';
+                    row.onclick = () => showCharacterDetails(member);
+
+                    const status = getMemberStatus(member);
+                    const statusIcon = getStatusIcon(member);
+
+                    row.innerHTML = `
+                        <img src="${member.portraitPath || 'assets/portraits/human_warrior_male_1.png'}" 
+                             class="roster-portrait" 
+                             onerror="this.src='assets/portraits/human_warrior_male_1.png'" />
+                        <div class="roster-info">
+                            <div class="roster-name">${member.name}</div>
+                            <div class="roster-details">
+                                Lvl ${member.level || 1} • ${member.classId} • ${statusIcon} ${status}
+                            </div>
+                        </div>
+                        <div class="roster-stats-preview">
+                            STR ${member.stats.str} • INT ${member.stats.int} • DEX ${member.stats.dex}
+                        </div>
+                    `;
+
+                    list.appendChild(row);
+                });
+            }
+
+            function getMemberStatus(member) {
+                if (member.isDead) return 'Dead';
+                if (member.injuries && member.injuries.length > 0) return 'Injured';
+                if (member.isAssigned || member.assignedQuest) return 'On Quest';
+                return 'Ready';
+            }
+
+            function getStatusIcon(member) {
+                if (member.isDead) return '💀';
+                if (member.injuries && member.injuries.length > 0) return '🏥';
+                if (member.isAssigned || member.assignedQuest) return '⚔️';
+                return '✅';
+            }
+
+            function showCharacterDetails(member) {
+                // Use existing inspector modal for now, will upgrade later
+                const modal = document.getElementById('inspector-modal');
+                const content = document.getElementById('inspector-content');
+
+                const status = getMemberStatus(member);
+                const qh = member.questHistory || { total: 0, byRank: {} };
+
+                let detailText = `=== ${member.name} ===\n\n`;
+                detailText += `Level: ${member.level || 1}\n`;
+                detailText += `Class: ${member.classId}\n`;
+                detailText += `Race: ${member.race}\n`;
+                detailText += `Status: ${status}\n`;
+                detailText += `\n--- STATS ---\n`;
+                detailText += `STR: ${member.stats.str}\n`;
+                detailText += `INT: ${member.stats.int}\n`;
+                detailText += `DEX: ${member.stats.dex}\n`;
+                detailText += `VIT: ${member.stats.vit}\n`;
+
+                if (member.xp !== undefined) {
+                    detailText += `\nXP: ${member.xp || 0} / ${member.xpToNext || 100}\n`;
+                }
+
+                if (member.traits && member.traits.length > 0) {
+                    detailText += `\n--- TRAITS ---\n`;
+                    member.traits.forEach(t => detailText += `• ${t}\n`);
+                }
+
+                if (member.injuries && member.injuries.length > 0) {
+                    detailText += `\n--- INJURIES ---\n`;
+                    member.injuries.forEach(inj => {
+                        const duration = inj.duration === -1 ? 'Permanent' : `${inj.duration} days`;
+                        detailText += `• ${inj.name} (${duration})\n`;
+                    });
+                }
+
+                detailText += `\n--- SERVICE RECORD ---\n`;
+                detailText += `Total Missions: ${qh.total || 0}\n`;
+                if (qh.byRank) {
+                    detailText += `S-Rank: ${qh.byRank.S || 0} • A-Rank: ${qh.byRank.A || 0}\n`;
+                    detailText += `B-Rank: ${qh.byRank.B || 0} • C-Rank: ${qh.byRank.C || 0}\n`;
+                }
+
+                if (member.visuals && member.visuals.length > 0) {
+                    detailText += `\n--- PHYSIQUE ---\n`;
+                    detailText += member.visuals.join(', ');
+                }
+
+                content.textContent = detailText;
+                modal.classList.remove('hidden');
+            }
+
+            // ================================================
             // EVENT LISTENERS
             // ================================================
 

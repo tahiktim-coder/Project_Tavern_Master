@@ -838,6 +838,7 @@ button:active {
 .assign-member-status.injured {
     color: #c62828;
 }
+
 /* Guild Member Badge */
 .guild-badge {
     display: inline-block;
@@ -851,4 +852,49 @@ button:active {
     margin: 4px 0;
     border: 1px solid #ffd700;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   ROSTER ROW (Enhanced)
+======================================== */
+
+.roster-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(139, 105, 20, 0.2);
+    border: 1px solid #8b6914;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.roster-row:hover {
+    background: rgba(139, 105, 20, 0.4);
+    border-color: var(--gold);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.roster-portrait {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    border: 2px solid #8b6914;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.roster-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.roster-stats-preview {
+    font-size: 11px;
+    color: #fff;
+    opacity: 0.8;
+    white-space: nowrap;
 }
