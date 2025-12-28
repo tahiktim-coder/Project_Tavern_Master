@@ -1151,6 +1151,9 @@
                 setScreen('game');
                 startNewDay(); // Resume
             });
+            document.getElementById('btn-close-inspector').addEventListener('click', () => {
+                document.getElementById('inspector-modal').classList.add('hidden');
+            });
 
             // ================================================
             // ADVENTURER DATA (Inline - ES6 module not loading)
