@@ -101,7 +101,11 @@ class PersistenceManager {
 
     resetDailyState() {
         this.roster.forEach(adv => {
+            // CRITICAL FIX: Clear quest assignment so guild members become available again
             adv.isAssigned = false;
+            adv.assignedQuest = null;
+            adv.currentQuest = null;
+
             // Healing Logic
             if (adv.injuries && adv.injuries.length > 0) {
                 adv.injuries.forEach(inj => {
@@ -114,7 +118,7 @@ class PersistenceManager {
                 if (adv.injuries.length === 0) adv.traits = adv.traits.filter(t => t !== 'Injured');
             }
         });
-        console.log("Persistence: Daily Roster Reset (Healing Applied, Perm Injuries Kept)");
+        console.log("Persistence: Daily Roster Reset (Quests cleared, Healing Applied, Perm Injuries Kept)");
     }
 
     getReturningAdventurer() {

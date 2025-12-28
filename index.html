@@ -183,6 +183,9 @@
                 townReputation: 0
             };
 
+            // IMPORTANT: Expose to window so Town.js can access guild members
+            window.gameState = gameState;
+
             // DOM Elements Cache
             const DOM = {
                 screens: {
@@ -936,6 +939,15 @@
                 if (window.GameSystems && window.GameSystems.ResolutionManager) {
                     visitor.economyRef = gameState.economy;
                     const result = window.GameSystems.ResolutionManager.resolve(quest, visitor);
+
+                    // CRITICAL FIX: Only save to roster if this IS a guild member
+                    // Town pool visitors should NOT become guild members just from taking quests!
+                    if (visitor.isGuildMember && gameState.persistence) {
+                        gameState.persistence.saveAdventurer(visitor, {
+                            result: result.result,
+                            questTitle: quest.title
+                        });
+                    }
 
                     // Store result for end-of-day report
                     if (!gameState.pendingReports) gameState.pendingReports = [];

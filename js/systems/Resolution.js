@@ -176,14 +176,22 @@ class ResolutionManager {
         // 3.6 PERSISTENCE SAVE (Optional)
         try {
             if (window.gameState && window.gameState.persistence) {
-                console.log("Resolution: Saving to persistence...");
-                window.gameState.persistence.saveAdventurer(adventurer, {
-                    questTitle: quest.title,
-                    result: result
-                });
+                console.log("Resolution: Checking if should save to persistence...");
 
-                // SAVE GLOBAL STATE (Crown Progress)
-                window.gameState.persistence.saveGlobal(window.gameState);
+                // CRITICAL: Only save to roster if this is a GUILD MEMBER
+                // Town pool visitors taking quests should NOT be saved to roster!
+                if (adventurer.isGuildMember) {
+                    console.log("Resolution: Saving guild member to persistence...");
+                    window.gameState.persistence.saveAdventurer(adventurer, {
+                        questTitle: quest.title,
+                        result: result
+                    });
+
+                    // SAVE GLOBAL STATE (Crown Progress)
+                    window.gameState.persistence.saveGlobal(window.gameState);
+                } else {
+                    console.log("Resolution: Skipping save - visitor is not a guild member");
+                }
 
             } else {
                 console.log("Resolution: Persistence system not available, skipping save");
