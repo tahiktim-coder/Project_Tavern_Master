@@ -296,6 +296,17 @@
                 DOM.charName.textContent = char.name;
                 DOM.charSubtitle.textContent = `Level ${char.level || 1} ${char.classId} (${char.race})`;
 
+                // Add guild member badge if applicable
+                const existingBadge = document.querySelector('.guild-badge');
+                if (existingBadge) existingBadge.remove();
+
+                if (char.isGuildMember) {
+                    const badge = document.createElement('div');
+                    badge.className = 'guild-badge';
+                    badge.innerHTML = '🛡️ GUILD MEMBER';
+                    DOM.charSubtitle.insertAdjacentElement('afterend', badge);
+                }
+
                 // Portrait - Use visualClass (mapped by generator) instead of classId
                 // visualClass maps logical classes (guard, monk, etc.) to asset names (warrior, cleric, etc.)
                 const visualClass = char.visualClass || char.classId; // Fallback if old data

@@ -838,3 +838,17 @@ button:active {
 .assign-member-status.injured {
     color: #c62828;
 }
+/* Guild Member Badge */
+.guild-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #8b6914 0%, #b8960a 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-align: center;
+    margin: 4px 0;
+    border: 1px solid #ffd700;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}

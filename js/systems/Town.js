@@ -43,7 +43,21 @@ class TownManager {
             this.generateWeeklyPool(1);
         }
 
-        // Reset Status & Filter Eligible
+        // Get GUILD MEMBERS who are Ready (not injured, not on quest, not dead)
+        let guildMembers = [];
+        if (window.gameState && window.gameState.persistence && window.gameState.persistence.roster) {
+            guildMembers = Array.from(window.gameState.persistence.roster.values()).filter(member => {
+                return !member.isDead &&
+                    (!member.injuries || member.injuries.length === 0) &&
+                    !member.assignedQuest;
+            });
+
+            // Mark them as guild members for UI
+            guildMembers.forEach(m => m.isGuildMember = true);
+            console.log(`Town: ${guildMembers.length} guild members available today.`);
+        }
+
+        // Reset Status & Filter Eligible TOWN POOL members
         const eligibleIds = [];
         const deadIds = [];
 
@@ -70,19 +84,23 @@ class TownManager {
             console.log(`Town: Removed dead adventurer ${id} from pool.`);
         });
 
-        this.dailyQueue = [];
-
-        // Shuffle eligible
+        // Shuffle eligible town pool
         for (let i = eligibleIds.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [eligibleIds[i], eligibleIds[j]] = [eligibleIds[j], eligibleIds[i]];
         }
 
-        // Pick 4-6 to visit today
-        const maxVisitors = Math.min(eligibleIds.length, 4 + Math.floor(Math.random() * 3));
-        this.dailyQueue = eligibleIds.slice(0, maxVisitors);
+        // Calculate how many town visitors to add (4-6 total visitors, including guild)
+        const maxVisitors = Math.min(eligibleIds.length + guildMembers.length, 4 + Math.floor(Math.random() * 3));
+        const townVisitorsNeeded = Math.max(0, maxVisitors - guildMembers.length);
 
-        console.log(`Town: ${this.dailyQueue.length} adventurers visiting today.`);
+        // Build queue: GUILD MEMBERS FIRST, then town pool
+        this.dailyQueue = [
+            ...guildMembers, // These are adventurer objects
+            ...eligibleIds.slice(0, townVisitorsNeeded) // These are IDs referencing roster
+        ];
+
+        console.log(`Town: ${this.dailyQueue.length} visitors today (${guildMembers.length} guild, ${townVisitorsNeeded} town pool).`);
         return this.dailyQueue.length;
     }
 
@@ -90,8 +108,15 @@ class TownManager {
     getNextVisitor() {
         if (this.dailyQueue.length === 0) return null;
 
-        const id = this.dailyQueue.shift(); // Take from front
-        return this.roster.get(id);
+        const next = this.dailyQueue.shift(); // Take from front
+
+        // If it's a guild member (object), return directly
+        if (typeof next === 'object' && next.id) {
+            return next;
+        }
+
+        // Otherwise it's an ID from town pool
+        return this.roster.get(next);
     }
 
     // Called when Hired (Remove from Town Roster)
