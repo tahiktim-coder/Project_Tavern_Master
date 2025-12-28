@@ -314,51 +314,95 @@
                 // visualClass maps logical classes (guard, monk, etc.) to asset names (warrior, cleric, etc.)
                 const visualClass = char.visualClass || char.classId; // Fallback if old data
 
-                // Gender detection: check if name suggests female
-                const femaleNames = ['lyra', 'elara', 'sera', 'maya', 'aria', 'zara', 'nova'];
-                const isFemale = femaleNames.some(name => char.name.toLowerCase().includes(name));
-
-                // For humans, portraits follow: race_class_gender_variant.png
-                // For other races: race_class_variant.png
-                const portraitVariant = Math.floor(Math.random() * 3) + 1; // 1-3
-
-                if (char.race === 'human') {
-                    // Human portraits need gender segment
-                    const gender = isFemale ? 'female' : 'male';
-                    const path1 = `assets/portraits/human_${visualClass}_${gender}_${portraitVariant}.png`;
-                    DOM.charPortrait.src = path1;
-
-                    DOM.charPortrait.onerror = () => {
-                        // Try without variant number
-                        DOM.charPortrait.src = `assets/portraits/human_${visualClass}_${gender}_1.png`;
-                        DOM.charPortrait.onerror = () => {
-                            // Try opposite gender as fallback
-                            const altGender = isFemale ? 'male' : 'female';
-                            DOM.charPortrait.src = `assets/portraits/human_${visualClass}_${altGender}_1.png`;
-                            DOM.charPortrait.onerror = () => {
-                                // Final fallback: warrior
-                                DOM.charPortrait.src = `assets/portraits/human_warrior_male_1.png`;
-                            };
-                        };
-                    };
+                // CRITICAL FIX: Check for SAVED portrait path first!
+                if (char.portraitPath) {
+                    // Use the saved portrait path (from persistence)
+                    console.log(`✅ Using saved portrait for ${char.name}: ${char.portraitPath}`);
+                    DOM.charPortrait.src = char.portraitPath;
                 } else {
-                    // Non-human races: race_class_variant.png
-                    const basePath = `assets/portraits/${char.race}_${visualClass}`;
-                    DOM.charPortrait.src = `${basePath}_${portraitVariant}.png`;
+                    // Generate NEW portrait path (first time only)
+                    console.log(`🎨 Generating NEW portrait for ${char.name} (${visualClass})`);
 
-                    DOM.charPortrait.onerror = () => {
-                        // Try without variant
-                        DOM.charPortrait.src = `${basePath}_1.png`;
+                    // SIMPLIFIED: Guild members always get variant 1 (no randomness!)
+                    // Town visitors can have variants
+                    const portraitVariant = char.isGuildMember ? 1 : (Math.floor(Math.random() * 3) + 1);
+
+                    // Gender detection: check if name suggests female
+                    const femaleNames = ['lyra', 'elara', 'sera', 'maya', 'aria', 'zara', 'nova', 'mira'];
+                    const isFemale = femaleNames.some(name => char.name.toLowerCase().includes(name));
+
+                    // For humans, portraits follow: race_class_gender_variant.png
+                    if (char.race === 'human') {
+                        const gender = isFemale ? 'female' : 'male';
+                        const path1 = `assets/portraits/human_${visualClass}_${gender}_${portraitVariant}.png`;
+
+                        // Set and save immediately
+                        char.portraitPath = path1;
+                        DOM.charPortrait.src = path1;
+
+                        // Save to persistence for guild members
+                        if (char.isGuildMember && gameState.persistence) {
+                            const data = gameState.persistence.roster.get(char.id);
+                            if (data) {
+                                data.portraitPath = path1;
+                                console.log(`💾 Saved portrait to roster for ${char.name}: ${path1}`);
+                            }
+                        }
+
+                        // Fallback chain
                         DOM.charPortrait.onerror = () => {
-                            // Race-specific fallback
-                            const fallbacks = {
-                                elf: 'assets/portraits/elf_ranger_1.png',
-                                dwarf: 'assets/portraits/dwarf_paladin_1.png',
-                                orc: 'assets/portraits/orc_warrior_1.png'
+                            console.warn(`⚠️ Portrait not found: ${path1}`);
+                            // Try without variant
+                            const fallback1 = `assets/portraits/human_${visualClass}_${gender}_1.png`;
+                            DOM.charPortrait.src = fallback1;
+
+                            DOM.charPortrait.onerror = () => {
+                                // Try opposite gender
+                                const altGender = gender === 'male' ? 'female' : 'male';
+                                const fallback2 = `assets/portraits/human_${visualClass}_${altGender}_1.png`;
+                                DOM.charPortrait.src = fallback2;
+
+                                DOM.charPortrait.onerror = () => {
+                                    // Final fallback: warrior
+                                    DOM.charPortrait.src = `assets/portraits/human_warrior_male_1.png`;
+                                };
                             };
-                            DOM.charPortrait.src = fallbacks[char.race] || 'assets/portraits/human_warrior_male_1.png';
                         };
-                    };
+                    } else {
+                        // Non-human races: race_class_variant.png
+                        const basePath = `assets/portraits/${char.race}_${visualClass}`;
+                        // Guild members get variant 1, town visitors get random
+                        const variant = char.isGuildMember ? 1 : portraitVariant;
+                        const path1 = `${basePath}_${variant}.png`;
+
+                        // Set and save immediately
+                        char.portraitPath = path1;
+                        DOM.charPortrait.src = path1;
+
+                        // Save to persistence for guild members
+                        if (char.isGuildMember && gameState.persistence) {
+                            const data = gameState.persistence.roster.get(char.id);
+                            if (data) {
+                                data.portraitPath = path1;
+                                console.log(`💾 Saved portrait to roster for ${char.name}: ${path1}`);
+                            }
+                        }
+
+                        DOM.charPortrait.onerror = () => {
+                            console.warn(`⚠️ Portrait not found: ${path1}`);
+                            // Try variant 1
+                            DOM.charPortrait.src = `${basePath}_1.png`;
+                            DOM.charPortrait.onerror = () => {
+                                // Race-specific fallback
+                                const fallbacks = {
+                                    elf: 'assets/portraits/elf_ranger_1.png',
+                                    dwarf: 'assets/portraits/dwarf_paladin_1.png',
+                                    orc: 'assets/portraits/orc_warrior_1.png'
+                                };
+                                DOM.charPortrait.src = fallbacks[char.race] || 'assets/portraits/human_warrior_male_1.png';
+                            };
+                        };
+                    }
                 }
 
                 // Traits
@@ -826,6 +870,13 @@
                 // Gold already collected in endDay() - removed duplicate
 
                 gameState.day++;
+
+                // CRITICAL FIX: Clear quest assignments for guild members
+                if (gameState.persistence) {
+                    gameState.persistence.resetDailyState();
+                    console.log('✅ Guild member quests cleared for Day', gameState.day);
+                }
+
                 setScreen('game');
                 startNewDay();
             }

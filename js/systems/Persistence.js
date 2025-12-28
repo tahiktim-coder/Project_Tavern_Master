@@ -42,7 +42,10 @@ class PersistenceManager {
             questHistory: adventurer.questHistory || { total: 0, S: 0, A: 0, B: 0, C: 0, D: 0 },
             isGuildMember: adventurer.isGuildMember || false,
             isCrownRecruit: adventurer.isCrownRecruit || false,
-            injuries: adventurer.injuries || []
+            injuries: adventurer.injuries || [],
+            portraitPath: adventurer.portraitPath || null, // CRITICAL: Save portrait for consistency
+            visualClass: adventurer.visualClass || adventurer.classId,
+            level: adventurer.level || 1
         };
     }
 
@@ -61,6 +64,8 @@ class PersistenceManager {
             data.isCrownRecruit = adventurer.isCrownRecruit;
             data.injuries = adventurer.injuries || [];
             data.questHistory = adventurer.questHistory || data.questHistory;
+            data.portraitPath = adventurer.portraitPath || data.portraitPath; // Preserve portrait
+            data.level = adventurer.level || data.level;
         }
 
         // Update based on Result
